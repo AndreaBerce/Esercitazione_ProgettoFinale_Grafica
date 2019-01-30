@@ -69,7 +69,7 @@
 			"p3" : [1000, 0, 1000],
 			"material" : 0,
 			"transforms" : [
-				["Translate", [0, 0.5, 0]]
+				["Translate", [0, -0.5, 0]]
 			]
 		},
 		{
@@ -80,7 +80,7 @@
 			"p3" : [-1000, 0, -1000],
 			"material" : 0,
 			"transforms" : [
-				["Translate", [0, 0.5, 0]]
+				["Translate", [0, -0.5, 0]]
 			]
 		}
 	]
