@@ -1,3 +1,8 @@
+"use strict";
+//prova
+
+var filename = "assets/SphereTest.json";
+
 //CORE VARIABLES
 var canvas;
 var context;
@@ -10,213 +15,177 @@ var EPSILON = 0.00001; //error margins
 var scene;
 var camera;
 var surfaces = [];
+var materials;
+var aspect;
 //etc...
 
+//CLASSES PROTOTYPES
+var Camera = function(eye, up, at){
+    this.eye = glMatrix.vec3.fromValues(eye[0], eye[1], eye[2]);   // Posizione della camera  (e)
+    this.up = glMatrix.vec3.fromValues(up[0], up[1], up[2]);     // Inclinazione testa        (t)
+    this.at = glMatrix.vec3.fromValues(at[0], at[1], at[2]);     // Direzione dello sguardo   (g)
+
+    //Ricavo il camera frame {u,v,w} dai vettori eye,at,up (lezione 8, slide 19)
+    this.w = glMatrix.vec3.scale([], glMatrix.vec3.normalize([], this.at), -1);
+    this.u = glMatrix.vec3.normalize([], glMatrix.vec3.cross([], this.up, this.w)); //normalize(up * w)
+    this.v = glMatrix.vec3.cross([], this.w, this.u); //w * u;
 
 
-var T_MASSIMO = 500;
-
-/*
-var Ray = function(eye, dir, T_MAX){
-    this.eye = eye;
-    this.dir = dir;
-    this.T_MASSIMO = T_MAX;
-}
-*/
-
-/*
-var Camera = function(eye, at, up, fovy, aspect){
-    this.eye = glMatrix.vec3.create();
-    this.at = glMatrix.vec3.create();
-    this.up = glMatrix.vec3.create();
-    glMatrix.vec3.copy(this.eye, eye);
-    glMatrix.vec3.copy(this.at, at);
-    glMatrix.vec3.copy(this.up, up);
-    this.fovy = fovy;
-    this.aspect = aspect;
-
-    //this.h = 2 * Math.tan( rad( fovy / 2.0 ) );
-    //this.w = this.h * aspect;
-
-    this.g = glMatrix.vec3.create();
-    this.w = glMatrix.vec3.create();
-    this.u = glMatrix.vec3.create();
-    this.v = glMatrix.vec3.create();
-
-    temp = glMatrix.vec3.create();
-    temp2 = glMatrix.vec3.create();
-
-    glMatrix.vec3.scale(temp, this.eye, -1);
-    //this.g = this.at - this.eye;
-    glMatrix.vec3.add(this.g, this.at, temp);
-    temp = Math.sqrt( this.g[0]^2 + this.g[1]^2 + this.g[2]^2 );
-    this.w[0] = - this.g[0] / temp;
-    this.w[1] = - this.g[1] / temp;
-    this.w[2] = - this.g[2] / temp;
-
-    temp = Math.sqrt(temp[0]^2 + temp[1]^2 + temp[2]^2);
-
-    glMatrix.vec3.cross(temp2, this.up, this.w);
-    this.u[0] = temp2[0] / temp;
-
-    glMatrix.vec3.dot(this.v, this.w, this.u);
-
-    console.log("camera inserita");
-    console.log(this.eye, this.at, this.up, this.fovy, "\ng: ", this.g, "\nw: ", this.w, "\nu: ", this.u, "\nv: ", this.v);
-
-    this.castRay = function(u, v){
-        var dir = glMatrix.vec3.create();
-        var d = 1;
-        dir[0] = - d * this.w[0] + u * this.u[0] + v *this.v[0];
-        dir[1] = - d * this.w[1] + u * this.u[1] + v *this.v[1];
-        dir[2] = - d * this.w[2] + u * this.u[2] + v *this.v[2];
-
-        var r = new Ray(this.eye, dir, T_MASSIMO);
-        if( DEBUG ){
-            console.log(dir[0]);
-            console.log("dir: " +dir);
-        }
-        return r;
-    }
-}
-*/
-
-
-var Ray = function(p, dir, tmax){
-    this.p = p; //origine
-    this.dir = glMatrix.vec3.normalize([],dir); //direzione
-    this.tmax = tmax; //max valore per cui il raggio è valido (TEST)
-
-    this.pointAt = function(t){
-        //return A + t * d
-        var tmp = glMatrix.vec3.create();
-        tmp = glMatrix.vec3.add( [], this.p, glMatrix.vec3.scale( [], this.dir, t ) ); //a + t*dir
-
-        //if (test < 10) console.log("p(+"+t+"): ["+tmp+"] direzione: "+this.dir);
-        return tmp;
-    }
-}
-
-
-var Camera = function(eye, up, at, fovy){
-    this.eye = glMatrix.vec3.fromValues( eye[0], eye[1], eye[2] ); // Posizione della camera    (e)
-    this.up = glMatrix.vec3.fromValues( up[0], up[1], up[2]);     // Inclinazione testa        (t)
-    this.at = glMatrix.vec3.fromValues( at[0], at[1], at[2]);     // Punto verso cui guardo    (?)
-    var dir = glMatrix.vec3.subtract( [], this.at, this.eye );   // Direzione dello sguardo   (g)
-
-    //Camera frame (Lezione 8, slide 19)
-    this.w = glMatrix.vec3.scale( [], glMatrix.vec3.normalize( [], dir ), -1 );           //- normalize(dir);
-    this.u = glMatrix.vec3.normalize( [], glMatrix.vec3.cross( [], this.up, this.w ) );   //normalize(up * w)
-    this.v = glMatrix.vec3.cross( [], this.w, this.u );                           //w * u;
-
-    // console.log(this.w, this.u, this.v);
-    this.fovy = fovy;
-
-    this.castRay = function(u, v){ //calcola il raggio che parte dalla camera e interseca il punto (u,v) nel rettangolo di vista
+    this.castRay = function(x,y){ //calcola il raggio che parte dalla camera e interseca il punto (x,y) nel rettangolo di vista
         //Calcolo la direzione del raggio.
         var dir = glMatrix.vec3.create();
         var d = 1; //per ipotesi dalle specifiche
-        dir[0] = - d * this.w[0] + u * this.u[0] + v * this.v[0];
-        dir[1] = - d * this.w[1] + u * this.u[1] + v * this.v[1];
-        dir[2] = - d * this.w[2] + u * this.u[2] + v * this.v[2];
+        dir[0] = - d * this.w[0] + x * this.u[0] + y * this.v[0];
+        dir[1] = - d * this.w[1] + x * this.u[1] + y * this.v[1];
+        dir[2] = - d * this.w[2] + x * this.u[2] + y * this.v[2];
 
-        var r = new Ray(this.eye, dir, T_MASSIMO);
-        if (DEBUG) console.log("dir:"+dir);
+        var r = new Ray(this.eye, dir);
         return r;
     }
 }
 
-
+//Surfaces
 var Sphere = function(center, radius, material){
     this.center = center;
     this.radius = radius;
     this.material = material;
-    console.log("sfera inserita");
-    console.log("sfera", this.center, this.radius, this.material);
 
-    this.intersects = function(ray){
-        var oc = glMatrix.vec3.create();
-        oc = glMatrix.vec3.add( [], ray.p, glMatrix.vec3.scale( [], this.center, -1 ) );
+    this.intersects = function(ray){//Implementa formula sulle slide del prof
+        var p = glMatrix.vec3.subtract([], ray.a, this.center); //e - c
+        var d = ray.dir;
+        //console.log("p: "+p+"; d: "+d);
 
-        var a = glMatrix.vec3.dot( ray.dir, ray.dir );
-        var b = 2.0 * glMatrix.vec3.dot( oc, ray.dir );
-        var c = glMatrix.vec3.dot( oc, oc) - radius * radius;
-        var discriminant = b*b - 4*a*c;
-        //return (discriminant > 0);
-        if(discriminant < 0){
-            return -1.0;
+        var ddotp = glMatrix.vec3.dot(d,p);
+        //console.log(ddotp);
+        var psquare = glMatrix.vec3.dot(p, p);
+        //console.log(psquare);
+        var dsquare = glMatrix.vec3.dot(d, d);
+        //console.log(dsquare);
+
+        var delta = ddotp*ddotp - dsquare*(psquare - this.radius*this.radius);
+        if(delta >= 0){
+            var t1 = (-ddotp + Math.sqrt(delta)) / dsquare;
+            var t2 = (-ddotp - Math.sqrt(delta)) / dsquare;
+
+            if(t1 > 0){
+                return t1;
+            }else{
+                return t2;
+            }
         }else{
-            return (-b - Math.sqrt(discriminant) ) / (2.0 * a);
+            return false;
         }
+    }
+
+    this.hitSurface = function(ray){ //wrapper per debug
+        return intersects(ray);
     }
 }
 
+var Triangle = function(p1, p2, p3, material){
+    this.p1 = p1;
+    this.p2 = p2;
+    this.p3 = p3;
+    this.material = material;
+}
+
+//Ray-Intersect
+var Ray = function(a, dir){
+    this.a = a; //origine
+    this.dir = dir; //direzione
+
+    this.pointAtParameter = function( t ){//return A + t * d
+        var tmp;
+        //tmp = glMatrix.vec3.add([],a,glMatrix.vec3.scale([],d,t)); //non si capisce niente così
+        tmp[0] = this.a + t * dir[0];
+        tmp[1] = this.a + t * dir[1];
+        tmp[2] = this.a + t * dir[2];
+        return tmp;
+    }
+}
+
+var Intersection = function(x, y, z){
+    this.int = new glMatrix.vec3(x, y, z);
+}
+
+//Lighting
+var Light = function(){
+}
+
+var Material = function(){
+}
 
 
 //initializes the canvas and drawing buffers
-function init() {
+function init(){
     canvas = $('#canvas')[0];
     context = canvas.getContext("2d");
     imageBuffer = context.createImageData(canvas.width, canvas.height); //buffer for pixels
-    loadSceneFile("assets/SphereTest.json");
-}
 
+    loadSceneFile(filename);
+
+
+}
 
 
 //loads and "parses" the scene file at the given path
-function loadSceneFile(filepath) {
+function loadSceneFile(filepath){
     scene = Utils.loadJSON(filepath); //load the scene
 
-    camera = new Camera(scene.camera.eye, scene.camera.at, scene.camera.up, scene.camera.fovy, scene.camera.aspect);
-
-    console.log("eye:", scene.camera.eye, "at:", scene.camera.at, "up:", scene.camera.up, "fovy:", scene.camera.fovy, "aspect:", scene.camera.aspect);
-
-    surfaces.push(new Sphere(scene.surfaces[0].center, scene.surfaces[0].radius, scene.surfaces[0].material));
+    // console.log(scene.camera); loading is ok
 
     //TODO - set up camera
+    //set up camera
+    aspect = scene.camera.aspect;
+    camera = new Camera(scene.camera.eye, scene.camera.up, scene.camera.at);
 
     //TODO - set up surfaces
+    for(var i = 0; i < scene.surfaces.length; i++) {
+        if (scene.surfaces[i].shape == "Sphere") {
+            surfaces.push(new Sphere(scene.surfaces[i].center, scene.surfaces[i].radius, scene.surfaces[i].materials));
+        }
+        if (scene.surfaces[i].shape == "Triangle") {
+            surfaces.push(new Triangle(scene.surfaces[i].p1, scene.surfaces[i].p2, scene.surfaces[i].p3, scene.surfaces[i].material));
+        }
 
-
-    render(); //render the scene
+    }
 
 }
 
 
-
 //renders the scene
-function render() {
-    console.log("renderizzo");
+function render(){
+    var h,w,u,v,s;
+    var backgroundcolor = [0,0,0];
     var start = Date.now(); //for logging
+    h = 2*Math.tan(rad(scene.camera.fovy/2.0));
+    w = h * aspect;
 
-    var ny = canvas.height;
-    var nx = canvas.width;
+    for (var i = 0; i <= canvas.width;  i++) { //indice bordo sinistro se i=0 (bordo destro se i = nx-1)
+        for (var j = 0; j <= canvas.height; j++) {
+            u = (w*i/(canvas.width-1)) - w/2.0;
+            v = (-h*j/(canvas.height-1)) + h/2.0;
 
-    var h = 2 * Math.tan( rad( scene.camera.fovy / 2.0 ) );
-    var w = h * scene.camera.aspect;
+            //TODO - fire a ray though each pixel
+            var ray = camera.castRay(u, v);
+            //if (i < 1 && j< 10) console.log(ray);
 
+            var t = false;
+            for (var k = 0; k < surfaces.length; k++) {
+                //calculate the intersection of that ray with the scene
+                t = surfaces[k].intersects(ray);
 
-    for( iy = 0; iy < ny; iy++ ){
-        for( ix = 0; ix < nx; ix++){
-            var u = ((w * ix) / (canvas.width - 1) ) - w / 2.0;
-            var v = ((-h * iy) / (canvas.height - 1) ) + h / 2.0;
-            ray = camera.castRay( u, v );
-            //ray = camera.castRay(ix, iy);
-            t = surfaces[0].intersects(ray);
-            if( t > 0 ){
-                setPixel(ix, iy, [1,1,1]);
-            }else{
-                setPixel(ix, iy, [0,0,0]);
+                //set the pixel to be the color of that intersection (using setPixel() method)
+                if(t == false){
+                    setPixel(i, j, backgroundcolor);
+                }
+                else{
+                    setPixel(i, j, [255,0,0]);
+                }
             }
+
         }
     }
-
-     //TODO - fire a ray though each pixel
-
-    //TODO - calculate the intersection of that ray with the scene
-
-    //TODO - set the pixel to be the color of that intersection (using setPixel() method)
-
 
     //render the pixels that have been set
     context.putImageData(imageBuffer,0,0);
@@ -226,8 +195,6 @@ function render() {
     console.log("rendered in: "+(end-start)+"ms");
 
 }
-
-
 
 //sets the pixel at the given x,y to the given color
 /**
@@ -244,13 +211,10 @@ function setPixel(x, y, color){
     imageBuffer.data[i+3] = 255; //(color[3]*255) | 0; //switch to include transparency
 }
 
-
-
 //converts degrees to radians
-function rad(degrees){
+function rad( degrees ){
     return degrees*Math.PI/180;
 }
-
 
 
 //on load, run the application
@@ -269,8 +233,11 @@ $(document).ready(function(){
         var x = e.pageX - $('#canvas').offset().left;
         var y = e.pageY - $('#canvas').offset().top;
         DEBUG = true;
-        console.log( camera.castRay(x,y) ); //cast a ray through the point
-        console.log( surfaces[0].intersects( camera.castRay(x,y) ) );
+        h = 2*Math.tan(rad(scene.camera.fovy/2.0));
+        w = h * aspect;
+        u = (w*x/(canvas.width-1)) - w/2.0;
+        v = (-h*y/(canvas.height-1)) + h/2.0;
+        camera.castRay(u,v); //cast a ray through the point
         DEBUG = false;
     });
 
