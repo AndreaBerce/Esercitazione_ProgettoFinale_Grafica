@@ -3,17 +3,17 @@
 		"eye" : [0.0, 0.0, 0.0],
 		"up" : [0.0, 1.0, 0.0],
 		"at" : [0.0, 0.0, -1.0],
-		"fovy" : 45, "aspect" : 1 
+		"fovy" : 45, "aspect" : 1
 	},
 	"bounce_depth" : 0,
 	"shadow_bias" : 0.0001,
 
-	"lights" : [ 
+	"lights" : [
 		{"source" : "Ambient", "color" : [0.1,0.1,0.1]},
 		{"source" : "Point", "position" : [1.5, 1.5, -1], "color" : [1,1,1]}
 	],
 
-	"materials" : [ 
+	"materials" : [
 		{
 			"ka" : [1,1,0],
 			"kd" : [0.8,0.8,0],

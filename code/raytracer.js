@@ -1,8 +1,3 @@
-"use strict";
-//prova
-
-var filename = "assets/SphereTest.json";
-
 //CORE VARIABLES
 var canvas;
 var context;
@@ -14,10 +9,15 @@ var EPSILON = 0.00001; //error margins
 //scene to render
 var scene;
 var camera;
-var surfaces = [];
+var surfaces;
 var materials;
+var ambientLight;
+var pointLight;
+var directionalLight;
 var aspect;
 //etc...
+
+var filename = "assets/SphereTest.json";
 
 //CLASSES PROTOTYPES
 var Camera = function(eye, up, at){
@@ -29,6 +29,8 @@ var Camera = function(eye, up, at){
     this.w = glMatrix.vec3.scale([], glMatrix.vec3.normalize([], this.at), -1);
     this.u = glMatrix.vec3.normalize([], glMatrix.vec3.cross([], this.up, this.w)); //normalize(up * w)
     this.v = glMatrix.vec3.cross([], this.w, this.u); //w * u;
+
+    console.log("eye camera: ", this.eye);
 
 
     this.castRay = function(x,y){ //calcola il raggio che parte dalla camera e interseca il punto (x,y) nel rettangolo di vista
@@ -45,13 +47,18 @@ var Camera = function(eye, up, at){
 }
 
 //Surfaces
-var Sphere = function(center, radius, material){
-    this.center = center;
-    this.radius = radius;
-    this.material = material;
+var Sphere = function(centro, raggio, materiale){
+    this.centro = glMatrix.vec3.fromValues(centro[0], centro[1], centro[2]);
+    this.raggio = raggio;
+    this.materiale = materiale;
+    this.trasformate = glMatrix.mat4.create();
+    this.trasformateI = glMatrix.mat4.create();
+    console.log("sfera inserita");
+    console.log("sfera", this.centro, this.raggio, this.materiale);
 
-    this.intersects = function(ray){//Implementa formula sulle slide del prof
-        var p = glMatrix.vec3.subtract([], ray.a, this.center); //e - c
+    this.intersect = function(ray){//Implementa formula sulle slide del prof
+        var p = glMatrix.vec3.create();
+        glMatrix.vec3.subtract(p, ray.p, this.centro); //e - c
         var d = ray.dir;
         //console.log("p: "+p+"; d: "+d);
 
@@ -62,7 +69,7 @@ var Sphere = function(center, radius, material){
         var dsquare = glMatrix.vec3.dot(d, d);
         //console.log(dsquare);
 
-        var delta = ddotp*ddotp - dsquare*(psquare - this.radius*this.radius);
+        var delta = ddotp*ddotp - dsquare*(psquare - this.raggio*this.raggio);
         if(delta >= 0){
             var t1 = (-ddotp + Math.sqrt(delta)) / dsquare;
             var t2 = (-ddotp - Math.sqrt(delta)) / dsquare;
@@ -78,7 +85,55 @@ var Sphere = function(center, radius, material){
     }
 
     this.hitSurface = function(ray){ //wrapper per debug
-        return intersects(ray);
+        var r = new Ray( glMatrix.vec3.transformMat4([], ray.p, this.trasformateI), glMatrix.vec3.transformMat4([], ray.dir, this.trasformateI) );
+        return this.intersect(r);
+    }
+
+    this.traslazione = function(vettore){
+        console.log("traslazione sfera");
+        glMatrix.mat4.translate(this.trasformate, this.trasformate, vettore);
+        glMatrix.mat4.invert(this.trasformateI, this.trasformate);
+        this.centro[0] = this.centro[0] + vettore[0];
+        this.centro[1] = this.centro[1] + vettore[1];
+        this.centro[2] = this.centro[2] + vettore[2];
+        console.log("centro: ", this.centro);
+        console.log("traslazione: ", this.trasformate, this.trasformateI);
+    }
+
+    this.rotazione = function(vettore){
+        console.log("rotazione sfera");
+        if( vettore[0] != 0 ){
+            glMatrix.mat4.rotateX(this.trasformate, this.trasformate, vettore[0]);
+        }
+        if( vettore[1] != 0 ){
+            glMatrix.mat4.rotateY(this.trasformate, this.trasformate, vettore[1]);
+        }
+        if( vettore[2] != 0 ){
+            glMatrix.mat4.rotateZ(this.trasformate, this.trasformate, vettore[2]);
+        }
+        //console.log("traslazione: ", this.trasformate, this.trasformateI);
+        glMatrix.mat4.invert(this.trasformateI, this.trasformate);
+    }
+
+    this.scala = function(vettore){
+        console.log("scala sfera");
+        glMatrix.mat4.scale(this.trasformate, this.trasformate, vettore);
+        glMatrix.mat4.invert(this.trasformateI, this.trasformate);
+        //console.log("traslazione: ", this.trasformate, this.trasformateI);
+    }
+
+    this.getNormal = function(point){
+        return glMatrix.vec3.subtract([], this.centro, point);
+    }
+
+    this.shade = function(ray, point, normale, light){
+        var v = - glMatrix.vec3.normalize([], ray.dir);
+        var l = glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point) );
+        var temp = glMatrix.vec3.dot([], l, normale);
+        if( max(0, temp) ){
+            return [0, 0, 0];
+        }
+        return glMatrix.vec3.cross( [], glMatrix.vec3.cross( [materials[this.materiale], materials[this.materiale], materials[this.materiale]], light.colore ), [temp, temp, temp] );
     }
 }
 
@@ -90,16 +145,16 @@ var Triangle = function(p1, p2, p3, material){
 }
 
 //Ray-Intersect
-var Ray = function(a, dir){
-    this.a = a; //origine
+var Ray = function(p, dir){
+    this.p = p; //origine
     this.dir = dir; //direzione
 
     this.pointAtParameter = function( t ){//return A + t * d
         var tmp;
-        //tmp = glMatrix.vec3.add([],a,glMatrix.vec3.scale([],d,t)); //non si capisce niente così
-        tmp[0] = this.a + t * dir[0];
-        tmp[1] = this.a + t * dir[1];
-        tmp[2] = this.a + t * dir[2];
+        tmp = glMatrix.vec3.add([], this.p, glMatrix.vec3.scale([], this.dir, t)); //non si capisce niente così
+        // tmp[0] = this.p + t * dir[0];
+        // tmp[1] = this.p + t * dir[1];
+        // tmp[2] = this.p + t * dir[2];
         return tmp;
     }
 }
@@ -109,10 +164,27 @@ var Intersection = function(x, y, z){
 }
 
 //Lighting
-var Light = function(){
+var AmbientLight = function(colore){
+    this.colore = colore;
+    console.log("luce ambientale: ", colore);
 }
 
-var Material = function(){
+var PointLight = function(colore, punto){
+    this.colore = colore;
+    this.punto = punto;
+}
+
+var DirectionalLight = function(colore, direzione){
+    this.colore = colore;
+    this.direzione = direzione;
+}
+
+var Material = function(ka, kd, ks, shininess, kr){
+    this.ka = ka;
+    this.kd = kd;
+    this.ks = ks;
+    this.shininess = shininess;
+    this.kr = kr;
 }
 
 
@@ -121,6 +193,12 @@ function init(){
     canvas = $('#canvas')[0];
     context = canvas.getContext("2d");
     imageBuffer = context.createImageData(canvas.width, canvas.height); //buffer for pixels
+
+    surfaces = new Array();
+    materials = new Array();
+    ambientLight = new Array();
+    pointLight = new Array();
+    directionalLight = new Array();
 
     loadSceneFile(filename);
 
@@ -132,7 +210,7 @@ function init(){
 function loadSceneFile(filepath){
     scene = Utils.loadJSON(filepath); //load the scene
 
-    // console.log(scene.camera); loading is ok
+    console.log(scene.camera); //loading is ok
 
     //TODO - set up camera
     //set up camera
@@ -140,14 +218,51 @@ function loadSceneFile(filepath){
     camera = new Camera(scene.camera.eye, scene.camera.up, scene.camera.at);
 
     //TODO - set up surfaces
-    for(var i = 0; i < scene.surfaces.length; i++) {
+    for(var i = 0; i < scene.surfaces.length; i++){
+        console.log("i = ", i);
         if (scene.surfaces[i].shape == "Sphere") {
-            surfaces.push(new Sphere(scene.surfaces[i].center, scene.surfaces[i].radius, scene.surfaces[i].materials));
-        }
-        if (scene.surfaces[i].shape == "Triangle") {
-            surfaces.push(new Triangle(scene.surfaces[i].p1, scene.surfaces[i].p2, scene.surfaces[i].p3, scene.surfaces[i].material));
-        }
+            surfaces.push( new Sphere(scene.surfaces[i].center, scene.surfaces[i].radius, scene.surfaces[i].material) );
 
+            if( scene.surfaces[i].hasOwnProperty('transforms') ){
+                for( var j = 0; j < (scene.surfaces[i].transforms.length); j++ ){
+                    console.log("trasformata: ", j);
+                    if( scene.surfaces[i].transforms[j][0] == "Translate" ){
+                        //console.log("render traslazione", scene.surfaces[i].transforms[j][1]);
+                        surfaces[i].traslazione( scene.surfaces[i].transforms[j][1] );
+                    }
+                    if( scene.surfaces[i].transforms[j][0] == "Rotate" ){
+                        //console.log("render rotazione", scene.surfaces[i].transforms[j][1]);
+                        surfaces[i].rotazione( scene.surfaces[i].transforms[j][1] );
+                    }
+                    if( scene.surfaces[i].transforms[j][0] == "Scale" ){
+                        //console.log("render scala", scene.surfaces[i].transforms[j][1]);
+                        surfaces[i].scala( scene.surfaces[i].transforms[j][1] );
+                    }
+                }
+            }
+        }
+        // if (scene.surfaces[i].shape == "Triangle") {
+        //     surfaces.push(new Triangle(scene.surfaces[i].p1, scene.surfaces[i].p2, scene.surfaces[i].p3, scene.surfaces[i].material));
+        // }
+
+
+    }
+
+    for(var i = 0; i < scene.materials.length; i++){
+        materials.push( new Material( scene.materials[i].ka, scene.materials[i].kd, scene.materials[i].ks, scene.materials[i].shininess, scene.materials[i].kr ) );
+        //console.log("Materiale: ", scene.materials[i].ka, scene.materials[i].kd, scene.materials[i].ks, scene.materials[i].shininess, scene.materials[i].kr);
+    }
+
+    for(var i = 0; i < scene.lights.length; i++){
+        if( scene.lights[i].source == "Ambient" ){
+            ambientLight.push( new AmbientLight(scene.lights[i].color) );
+        }
+        if( scene.lights[i].source == "Point" ){
+            ambientLight.push( new PointLight(scene.lights[i].color, scene.lights[i].position) );
+        }
+        if( scene.lights[i].source == "Directional" ){
+            ambientLight.push( new DirectionalLight(scene.lights[i].color, scene.lights[i].direction) );
+        }
     }
 
 }
@@ -170,22 +285,60 @@ function render(){
             var ray = camera.castRay(u, v);
             //if (i < 1 && j< 10) console.log(ray);
 
-            var t = false;
-            for (var k = 0; k < surfaces.length; k++) {
-                //calculate the intersection of that ray with the scene
-                t = surfaces[k].intersects(ray);
+            // var t = false;
+            // //console.log("surfaces.length = ", surfaces.length);
+            // for (var k = 0; k < surfaces.length; k++) {
+            //     if( !t ){
+            //         //calculate the intersection of that ray with the scene
+            //         t = surfaces[k].hitSurface(ray);
+            //
+            //         //set the pixel to be the color of that intersection (using setPixel() method)
+            //         if(t == false){
+            //             setPixel(i, j, backgroundcolor);
+            //         }
+            //         else{
+            //             setPixel(i, j, [1,1,1]);
+            //         }
+            //     }
+            // }
 
-                //set the pixel to be the color of that intersection (using setPixel() method)
-                if(t == false){
-                    setPixel(i, j, backgroundcolor);
-                }
-                else{
-                    setPixel(i, j, [255,0,0]);
+            var t = false;
+            var temp = false;
+            var temp2;
+            //console.log("surfaces.length = ", surfaces.length);
+            for( var k = 0; k < surfaces.length; k++ ){
+                //calculate the intersection of that ray with the scene
+                temp = surfaces[k].hitSurface(ray);
+                if( temp != false && ( temp < t || t == false) ){
+                    t = temp;
+                    temp2 = k;
                 }
             }
-
+            //set the pixel to be the color of that intersection (using setPixel() method)
+            if(t == false){
+                setPixel(i, j, backgroundcolor);
+            }
+            else{
+                var point = ray.pointAtParameter( t );
+                var normale = surfaces[temp2].getNormal(point);
+                // surfaces[temp2].shade(ray, point, normale, pointLight[0])
+                // var la = glMatrix.vec3.create();
+                // glMatrix.vec3.cross(la, materials[ surfaces[temp2].materiale ].ka, ambientLight[0].colore);
+                var la = glMatrix.vec3.create();
+                la[0] = materials[surfaces[0].materiale].ka[0] * ambientLight[0].colore[0];
+                la[1] = materials[surfaces[0].materiale].ka[1] * ambientLight[0].colore[1];
+                la[2] = materials[surfaces[0].materiale].ka[2] * ambientLight[0].colore[2];
+                setPixel(i, j, la);
+            }
         }
     }
+    console.log("m: ", materials[ surfaces[0].materiale ].ka);
+    console.log("a: ", ambientLight[0].colore);
+    var la = glMatrix.vec3.create();
+    la[0] = materials[surfaces[0].materiale].ka[0] * ambientLight[0].colore[0];
+    la[1] = materials[surfaces[0].materiale].ka[1] * ambientLight[0].colore[1];
+    la[2] = materials[surfaces[0].materiale].ka[2] * ambientLight[0].colore[2];
+    console.log("r: ", la );
 
     //render the pixels that have been set
     context.putImageData(imageBuffer,0,0);
@@ -224,8 +377,10 @@ $(document).ready(function(){
 
     //load and render new scene
     $('#load_scene_button').click(function(){
-        var filepath = 'assets/'+$('#scene_file_input').val()+'.json';
-        loadSceneFile(filepath);
+        filename = 'assets/'+$('#scene_file_input').val()+'.json';
+        init();
+        render();
+        console.log("renderizzato");
     });
 
     //debugging - cast a ray through the clicked pixel with DEBUG messaging on
