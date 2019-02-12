@@ -60,14 +60,10 @@ var Sphere = function(centro, raggio, materiale){
         var p = glMatrix.vec3.create();
         glMatrix.vec3.subtract(p, ray.p, this.centro); //e - c
         var d = ray.dir;
-        //console.log("p: "+p+"; d: "+d);
 
         var ddotp = glMatrix.vec3.dot(d,p);
-        //console.log(ddotp);
         var psquare = glMatrix.vec3.dot(p, p);
-        //console.log(psquare);
         var dsquare = glMatrix.vec3.dot(d, d);
-        //console.log(dsquare);
 
         var delta = ddotp*ddotp - dsquare*(psquare - this.raggio*this.raggio);
         if(delta >= 0){
@@ -123,17 +119,38 @@ var Sphere = function(centro, raggio, materiale){
     }
 
     this.getNormal = function(point){
-        return glMatrix.vec3.subtract([], this.centro, point);
+        return glMatrix.vec3.normalize([], glMatrix.vec3.subtract([], this.centro, point) );
     }
 
-    this.shade = function(ray, point, normale, light){
+    this.shadeS = function(ray, point, normale, light){
         var v = - glMatrix.vec3.normalize([], ray.dir);
         var l = glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point) );
-        var temp = glMatrix.vec3.dot([], l, normale);
-        if( max(0, temp) ){
+        var r =  glMatrix.vec3.dot([], l, normale)
+        r[0] = 2 * r * normale[0] - l[0];
+        r[1] = 2 * r * normale[1] - l[1];
+        r[2] = 2 * r * normale[2] - l[2];
+        var temp = glMatrix.vec3.dot([],  r, v);
+        if( Math.max(0, temp) ){
             return [0, 0, 0];
         }
-        return glMatrix.vec3.cross( [], glMatrix.vec3.cross( [materials[this.materiale], materials[this.materiale], materials[this.materiale]], light.colore ), [temp, temp, temp] );
+        temp = temp ^ materials[this.materiale].shininess;
+        return [materials[this.materiale].ks[0] * light.colore[0] * temp,
+                materials[this.materiale].ks[1] * light.colore[1] * temp,
+                materials[this.materiale].ks[2] * light.colore[2] * temp];
+    }
+
+    this.shadeD = function(ray, point, normale, light){
+        // var v = - glMatrix.vec3.normalize([], ray.dir);
+        // var l = glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.direzione, point) );
+        var luce = [-light.direzione[0], -light.direzione[1], -light.direzione[2]];
+        glMatrix.vec3.normalize(luce, luce);
+        var temp = glMatrix.vec3.dot(luce, normale);
+        if( Math.max(0, temp) ){
+            return [0, 0, 0];
+        }
+        return [materials[this.materiale].kd[0] * light.colore[0] * temp,
+                materials[this.materiale].kd[1] * light.colore[1] * temp,
+                materials[this.materiale].kd[2] * light.colore[2] * temp];
     }
 }
 
@@ -177,6 +194,7 @@ var PointLight = function(colore, punto){
 var DirectionalLight = function(colore, direzione){
     this.colore = colore;
     this.direzione = direzione;
+    console.log("luce dirzionale: ", direzione);
 }
 
 var Material = function(ka, kd, ks, shininess, kr){
@@ -185,6 +203,7 @@ var Material = function(ka, kd, ks, shininess, kr){
     this.ks = ks;
     this.shininess = shininess;
     this.kr = kr;
+    console.log("shininess: ", shininess);
 }
 
 
@@ -227,15 +246,12 @@ function loadSceneFile(filepath){
                 for( var j = 0; j < (scene.surfaces[i].transforms.length); j++ ){
                     console.log("trasformata: ", j);
                     if( scene.surfaces[i].transforms[j][0] == "Translate" ){
-                        //console.log("render traslazione", scene.surfaces[i].transforms[j][1]);
                         surfaces[i].traslazione( scene.surfaces[i].transforms[j][1] );
                     }
                     if( scene.surfaces[i].transforms[j][0] == "Rotate" ){
-                        //console.log("render rotazione", scene.surfaces[i].transforms[j][1]);
                         surfaces[i].rotazione( scene.surfaces[i].transforms[j][1] );
                     }
                     if( scene.surfaces[i].transforms[j][0] == "Scale" ){
-                        //console.log("render scala", scene.surfaces[i].transforms[j][1]);
                         surfaces[i].scala( scene.surfaces[i].transforms[j][1] );
                     }
                 }
@@ -258,10 +274,10 @@ function loadSceneFile(filepath){
             ambientLight.push( new AmbientLight(scene.lights[i].color) );
         }
         if( scene.lights[i].source == "Point" ){
-            ambientLight.push( new PointLight(scene.lights[i].color, scene.lights[i].position) );
+            pointLight.push( new PointLight(scene.lights[i].color, scene.lights[i].position) );
         }
         if( scene.lights[i].source == "Directional" ){
-            ambientLight.push( new DirectionalLight(scene.lights[i].color, scene.lights[i].direction) );
+            directionalLight.push( new DirectionalLight(scene.lights[i].color, scene.lights[i].direction) );
         }
     }
 
@@ -322,23 +338,38 @@ function render(){
                 var point = ray.pointAtParameter( t );
                 var normale = surfaces[temp2].getNormal(point);
                 // surfaces[temp2].shade(ray, point, normale, pointLight[0])
-                // var la = glMatrix.vec3.create();
-                // glMatrix.vec3.cross(la, materials[ surfaces[temp2].materiale ].ka, ambientLight[0].colore);
+                var l = glMatrix.vec3.create();
                 var la = glMatrix.vec3.create();
-                la[0] = materials[surfaces[0].materiale].ka[0] * ambientLight[0].colore[0];
-                la[1] = materials[surfaces[0].materiale].ka[1] * ambientLight[0].colore[1];
-                la[2] = materials[surfaces[0].materiale].ka[2] * ambientLight[0].colore[2];
-                setPixel(i, j, la);
+                for( var k = 0; k < ambientLight.length; k++ ){
+                    la[0] = la[0] + materials[surfaces[temp2].materiale].ka[0] * ambientLight[k].colore[0];
+                    la[1] = la[1] + materials[surfaces[temp2].materiale].ka[1] * ambientLight[k].colore[1];
+                    la[2] = la[2] + materials[surfaces[temp2].materiale].ka[2] * ambientLight[k].colore[2];
+                }
+                var ld = glMatrix.vec3.create();
+                for( var k = 0; k < directionalLight.length; k++ ){
+                    glMatrix.vec3.add(ld, ld, surfaces[temp2].shadeD( ray, point, normale, directionalLight[k] ) );
+                }
+                var ls = glMatrix.vec3.create();
+                for( var k = 0; k < pointLight.length; k++ ){
+                    glMatrix.vec3.add(ls, ls, surfaces[temp2].shadeS( ray, point, normale, pointLight[k] ) );
+                }
+                glMatrix.vec3.add(l, la, glMatrix.vec3.add([], ld, ls) );
+                setPixel(i, j, l);
             }
         }
     }
     console.log("m: ", materials[ surfaces[0].materiale ].ka);
     console.log("a: ", ambientLight[0].colore);
     var la = glMatrix.vec3.create();
-    la[0] = materials[surfaces[0].materiale].ka[0] * ambientLight[0].colore[0];
-    la[1] = materials[surfaces[0].materiale].ka[1] * ambientLight[0].colore[1];
-    la[2] = materials[surfaces[0].materiale].ka[2] * ambientLight[0].colore[2];
-    console.log("r: ", la );
+    la[0] = la[0] + materials[surfaces[0].materiale].ka[0] * ambientLight[0].colore[0];
+    la[1] = la[1] + materials[surfaces[0].materiale].ka[1] * ambientLight[0].colore[1];
+    la[2] = la[2] + materials[surfaces[0].materiale].ka[2] * ambientLight[0].colore[2];
+    console.log("la: ", la );
+    console.log("directionalLight: ", directionalLight);
+    console.log("pointLight: ", pointLight);
+    // var point = ray.pointAtParameter( t );
+    // var normale = surfaces[temp2].getNormal(point);
+    // console.log(surfaces[temp2].shade(ray, point, normale, pointLight[0]));
 
     //render the pixels that have been set
     context.putImageData(imageBuffer,0,0);
