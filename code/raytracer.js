@@ -151,25 +151,23 @@ var Sphere = function(centro, raggio, materiale){
                 materials[this.materiale].kd[2] * light.colore[2] * temp];
     }
 
-    this.count = 0;
-
     this.shadeDPhong = function(ray, point, normale, light){
-        var v = - glMatrix.vec3.normalize([], ray.dir);
+        var v = glMatrix.vec3.normalize([], glMatrix.vec3.scale([], ray.dir, -1));
         var luce = [-light.direzione[0], -light.direzione[1], -light.direzione[2]];
         glMatrix.vec3.normalize(luce, luce);
-        var temp = glMatrix.vec3.dot([], luce, normale);
+        var temp = glMatrix.vec3.dot( luce, normale);
         var r = [2 * temp * normale[0] - luce[0],
                  2 * temp * normale[1] - luce[1],
                  2 * temp * normale[2] - luce[2]];
-        temp = glMatrix.vec3.dot([], r, v);
-        if( !Math.max(0, temp) ){
-            this.count = this.count + 1;
-            return [0, 0, 0];
+        var temp = glMatrix.vec3.dot(r, v);
+        if( !Math.max(temp, 0) ){
+            return [0,0,0];
         }
-        temp = temp ^ materials[this.materiale].shininess;
-        return [Math.abs(materials[this.materiale].ks[0] * light.colore[0] * temp),
-                Math.abs(materials[this.materiale].ks[1] * light.colore[1] * temp),
-                Math.abs(materials[this.materiale].ks[2] * light.colore[2] * temp)];
+
+        temp = Math.pow(temp, materials[this.materiale].shininess);
+        return [materials[this.materiale].ks[0] * light.colore[0] * temp,
+                materials[this.materiale].ks[1] * light.colore[1] * temp,
+                materials[this.materiale].ks[2] * light.colore[2] * temp];
     }
 }
 
@@ -367,6 +365,7 @@ function render(){
     console.log("directionalLight: ", directionalLight);
     console.log("pointLight: ", pointLight);
     console.log("count = ", surfaces[0].count);
+    console.log("temp = ", surfaces[0].temp);
     // var point = ray.pointAtParameter( t );
     // var normale = surfaces[temp2].getNormal(point);
     // console.log(surfaces[temp2].shade(ray, point, normale, pointLight[0]));
