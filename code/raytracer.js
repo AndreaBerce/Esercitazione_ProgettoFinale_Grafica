@@ -70,7 +70,7 @@ var Sphere = function(centro, raggio, materiale){
             var t1 = (-ddotp + Math.sqrt(delta)) / dsquare;
             var t2 = (-ddotp - Math.sqrt(delta)) / dsquare;
 
-            if(t1 > 0){
+            if(t1 > 0 && t1 < t2){
                 return t1;
             }else{
                 return t2;
@@ -148,9 +148,9 @@ var Sphere = function(centro, raggio, materiale){
         if( Math.max(0, temp) ){
             return [0, 0, 0];
         }
-        return [materials[this.materiale].kd[0] * light.colore[0] * temp,
-                materials[this.materiale].kd[1] * light.colore[1] * temp,
-                materials[this.materiale].kd[2] * light.colore[2] * temp];
+        return [Math.abs(materials[this.materiale].kd[0] * light.colore[0] * temp),
+                Math.abs(materials[this.materiale].kd[1] * light.colore[1] * temp),
+                Math.abs(materials[this.materiale].kd[2] * light.colore[2] * temp)];
     }
 }
 
@@ -299,24 +299,6 @@ function render(){
 
             //TODO - fire a ray though each pixel
             var ray = camera.castRay(u, v);
-            //if (i < 1 && j< 10) console.log(ray);
-
-            // var t = false;
-            // //console.log("surfaces.length = ", surfaces.length);
-            // for (var k = 0; k < surfaces.length; k++) {
-            //     if( !t ){
-            //         //calculate the intersection of that ray with the scene
-            //         t = surfaces[k].hitSurface(ray);
-            //
-            //         //set the pixel to be the color of that intersection (using setPixel() method)
-            //         if(t == false){
-            //             setPixel(i, j, backgroundcolor);
-            //         }
-            //         else{
-            //             setPixel(i, j, [1,1,1]);
-            //         }
-            //     }
-            // }
 
             var t = false;
             var temp = false;
@@ -351,7 +333,7 @@ function render(){
                 }
                 var ls = glMatrix.vec3.create();
                 for( var k = 0; k < pointLight.length; k++ ){
-                    glMatrix.vec3.add(ls, ls, surfaces[temp2].shadeS( ray, point, normale, pointLight[k] ) );
+                    //glMatrix.vec3.add(ls, ls, surfaces[temp2].shadeS( ray, point, normale, pointLight[k] ) );
                 }
                 glMatrix.vec3.add(l, la, glMatrix.vec3.add([], ld, ls) );
                 setPixel(i, j, l);
