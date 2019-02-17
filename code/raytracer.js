@@ -54,7 +54,7 @@ var Sphere = function(centro, raggio, materiale){
     this.trasformate = glMatrix.mat4.create();
     this.trasformateI = glMatrix.mat4.create();
     console.log("sfera inserita");
-    console.log("sfera", this.centro, this.raggio, this.materiale);
+    console.log("sfera", this.centro);
 
     this.intersect = function(ray){//Implementa formula sulle slide del prof
         var p = glMatrix.vec3.create();
@@ -87,13 +87,11 @@ var Sphere = function(centro, raggio, materiale){
 
     this.traslazione = function(vettore){
         console.log("traslazione sfera");
-        glMatrix.mat4.translate(this.trasformate, this.trasformate, vettore);
-        glMatrix.mat4.invert(this.trasformateI, this.trasformate);
-        this.centro[0] = this.centro[0] + vettore[0];
-        this.centro[1] = this.centro[1] + vettore[1];
-        this.centro[2] = this.centro[2] + vettore[2];
-        console.log("centro: ", this.centro);
-        console.log("traslazione: ", this.trasformate, this.trasformateI);
+        // glMatrix.mat4.translate(this.trasformate, this.trasformate, vettore);
+        // glMatrix.mat4.invert(this.trasformateI, this.trasformate);
+        glMatrix.vec3.add(this.centro, this.centro, vettore);
+        // console.log("centro: ", this.centro);
+        // console.log("traslazione: ", this.trasformate, this.trasformateI);
     }
 
     this.rotazione = function(vettore){
@@ -107,22 +105,22 @@ var Sphere = function(centro, raggio, materiale){
         if( vettore[2] != 0 ){
             glMatrix.mat4.rotateZ(this.trasformate, this.trasformate, vettore[2]);
         }
-        //console.log("traslazione: ", this.trasformate, this.trasformateI);
         glMatrix.mat4.invert(this.trasformateI, this.trasformate);
+        console.log("rotazione: ", this.trasformate, this.trasformateI);
     }
 
     this.scala = function(vettore){
         console.log("scala sfera");
         glMatrix.mat4.scale(this.trasformate, this.trasformate, vettore);
         glMatrix.mat4.invert(this.trasformateI, this.trasformate);
-        //console.log("traslazione: ", this.trasformate, this.trasformateI);
+        console.log("scalatura: ", this.trasformate, this.trasformateI);
     }
 
     this.getNormal = function(point){
         return glMatrix.vec3.normalize([], glMatrix.vec3.subtract([], point, this.centro) );
     }
 
-    this.shadeP = function(ray, point, normale, light){
+    this.shadeP = function(ray, point, normale, light){//luce puntiforme
         //lambert
         var l = glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point) );
         var temp = glMatrix.vec3.dot(l, normale);
@@ -149,7 +147,7 @@ var Sphere = function(centro, raggio, materiale){
         return colore;
     }
 
-    this.shadeD = function(ray, point, normale, light){
+    this.shadeD = function(ray, point, normale, light){//luce direzionale
         //Lambert
         var l = glMatrix.vec3.normalize([], [-light.direzione[0], -light.direzione[1], -light.direzione[2]]);
         var temp = glMatrix.vec3.dot(l, normale);
@@ -360,8 +358,6 @@ function render(){
             }
         }
     }
-    console.log("m: ", materials[ surfaces[0].materiale ].ka);
-    console.log("a: ", ambientLight[0].colore);
     var la = glMatrix.vec3.create();
     la[0] = la[0] + materials[surfaces[0].materiale].ka[0] * ambientLight[0].colore[0];
     la[1] = la[1] + materials[surfaces[0].materiale].ka[1] * ambientLight[0].colore[1];
