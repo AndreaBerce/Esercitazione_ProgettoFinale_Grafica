@@ -97,13 +97,13 @@ var Sphere = function(centro, raggio, materiale){
     this.rotazione = function(vettore){
         console.log("rotazione sfera");
         if( vettore[0] != 0 ){
-            glMatrix.mat4.rotateX(this.trasformate, this.trasformate, vettore[0]);
+            glMatrix.mat4.rotateX(this.trasformate, this.trasformate, rad(vettore[0]) );
         }
         if( vettore[1] != 0 ){
-            glMatrix.mat4.rotateY(this.trasformate, this.trasformate, vettore[1]);
+            glMatrix.mat4.rotateY(this.trasformate, this.trasformate, rad(vettore[1]) );
         }
         if( vettore[2] != 0 ){
-            glMatrix.mat4.rotateZ(this.trasformate, this.trasformate, vettore[2]);
+            glMatrix.mat4.rotateZ(this.trasformate, this.trasformate, rad(vettore[2]) );
         }
         glMatrix.mat4.invert(this.trasformateI, this.trasformate);
         console.log("rotazione: ", this.trasformate, this.trasformateI);
