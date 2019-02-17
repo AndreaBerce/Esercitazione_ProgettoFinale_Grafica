@@ -130,7 +130,6 @@ var Sphere = function(centro, raggio, materiale){
                       materials[this.materiale].kd[1] * light.colore[1] * temp,
                       materials[this.materiale].kd[2] * light.colore[2] * temp];
         }
-
         //Phong
         var v = glMatrix.vec3.normalize([], glMatrix.vec3.scale([], ray.dir, -1));
         temp = 2 * glMatrix.vec3.dot(l, normale);
@@ -157,7 +156,6 @@ var Sphere = function(centro, raggio, materiale){
                       materials[this.materiale].kd[1] * light.colore[1] * temp,
                       materials[this.materiale].kd[2] * light.colore[2] * temp];
         }
-
         //Phong
         var v = glMatrix.vec3.normalize([], glMatrix.vec3.scale([], ray.dir, -1));
         temp = 2 * glMatrix.vec3.dot(l, normale);
@@ -188,9 +186,7 @@ var Ray = function(p, dir){
     this.dir = dir; //direzione
 
     this.pointAtParameter = function( t ){//return A + t * d
-        var tmp;
-        tmp = glMatrix.vec3.add([], this.p, glMatrix.vec3.scale([], this.dir, t)); //non si capisce niente così
-        return tmp;
+        return glMatrix.vec3.add([], this.p, glMatrix.vec3.scale([], this.dir, t));
     }
 }
 
@@ -238,8 +234,6 @@ function init(){
     directionalLight = new Array();
 
     loadSceneFile(filename);
-
-
 }
 
 
@@ -284,7 +278,6 @@ function loadSceneFile(filepath){
 
     for(var i = 0; i < scene.materials.length; i++){
         materials.push( new Material( scene.materials[i].ka, scene.materials[i].kd, scene.materials[i].ks, scene.materials[i].shininess, scene.materials[i].kr ) );
-        //console.log("Materiale: ", scene.materials[i].ka, scene.materials[i].kd, scene.materials[i].ks, scene.materials[i].shininess, scene.materials[i].kr);
     }
 
     for(var i = 0; i < scene.lights.length; i++){
@@ -339,21 +332,17 @@ function render(){
                 var normale = surfaces[temp2].getNormal(point);
                 // surfaces[temp2].shade(ray, point, normale, pointLight[0])
                 var l = glMatrix.vec3.create();
-                var la = glMatrix.vec3.create();
                 for( var k = 0; k < ambientLight.length; k++ ){
-                    la[0] = la[0] + materials[surfaces[temp2].materiale].ka[0] * ambientLight[k].colore[0];
-                    la[1] = la[1] + materials[surfaces[temp2].materiale].ka[1] * ambientLight[k].colore[1];
-                    la[2] = la[2] + materials[surfaces[temp2].materiale].ka[2] * ambientLight[k].colore[2];
+                    l[0] = l[0] + materials[surfaces[temp2].materiale].ka[0] * ambientLight[k].colore[0];
+                    l[1] = l[1] + materials[surfaces[temp2].materiale].ka[1] * ambientLight[k].colore[1];
+                    l[2] = l[2] + materials[surfaces[temp2].materiale].ka[2] * ambientLight[k].colore[2];
                 }
-                var ld = glMatrix.vec3.create();
                 for( var k = 0; k < directionalLight.length; k++ ){
-                    glMatrix.vec3.add( ld, ld, surfaces[temp2].shadeD( ray, point, normale, directionalLight[k] ) );
+                    glMatrix.vec3.add( l, l, surfaces[temp2].shadeD( ray, point, normale, directionalLight[k] ) );
                 }
-                var ls = glMatrix.vec3.create();
                 for( var k = 0; k < pointLight.length; k++ ){
-                    glMatrix.vec3.add( ld, ld, surfaces[temp2].shadeP( ray, point, normale, pointLight[k] ) );
+                    glMatrix.vec3.add( l, l, surfaces[temp2].shadeP( ray, point, normale, pointLight[k] ) );
                 }
-                glMatrix.vec3.add(l, la, glMatrix.vec3.add([], ld, ls) );
                 setPixel(i, j, l);
             }
         }
