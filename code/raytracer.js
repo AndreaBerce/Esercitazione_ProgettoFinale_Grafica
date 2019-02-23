@@ -31,6 +31,11 @@ var Camera = function(eye, up, at){
     this.v = glMatrix.vec3.cross([], this.w, this.u); //w * u;
 
     console.log("eye camera: ", this.eye);
+    console.log("up camera: ", this.up);
+    console.log("at camera: ", this.at);
+    console.log("w camera: ", this.w);
+    console.log("u camera: ", this.u);
+    console.log("v camera: ", this.v);
 
 
     this.castRay = function(x,y){ //calcola il raggio che parte dalla camera e interseca il punto (x,y) nel rettangolo di vista
@@ -48,7 +53,7 @@ var Camera = function(eye, up, at){
 
 //Surfaces
 var Sphere = function(centro, raggio, materiale){
-    this.centro = glMatrix.vec3.fromValues(centro[0], centro[1], centro[2]);
+    this.centro = centro;//glMatrix.vec3.fromValues(centro[0], centro[1], centro[2]);
     this.raggio = raggio;
     this.materiale = materiale;
     this.trasformate = glMatrix.mat4.create();
@@ -56,24 +61,62 @@ var Sphere = function(centro, raggio, materiale){
     console.log("sfera inserita");
     console.log("sfera", this.centro);
 
-    this.intersect = function(ray){//Implementa formula sulle slide del prof
-        var p = glMatrix.vec3.create();
-        glMatrix.vec3.subtract(p, ray.p, this.centro); //e - c
-        var d = ray.dir;
+    this.hitSurface2 = function(ray){ //wrapper per debug
+        var r = new Ray( glMatrix.vec3.transformMat4([], ray.p, this.trasformateI),
+                         glMatrix.vec3.transformMat4([], ray.dir, this.trasformateI) );
+        return this.intersect2(r);
+    }
+    this.intersect2 = function(ray){
+        console.log("centro1: ", this.centro);
+        console.log("centro2: ", glMatrix.vec3.transformMat4([], this.centro, this.trasformate) );
+        var p = glMatrix.vec3.subtract([], ray.p, this.centro);
 
-        var ddotp = glMatrix.vec3.dot(d,p);
-        var psquare = glMatrix.vec3.dot(p, p);
-        var dsquare = glMatrix.vec3.dot(d, d);
+        var dp = glMatrix.vec3.dot(ray.dir,p);
+        var pp = glMatrix.vec3.dot(p, p);
+        var dd = glMatrix.vec3.dot(ray.dir, ray.dir);
 
-        var delta = ddotp*ddotp - dsquare*(psquare - this.raggio*this.raggio);
+        var delta = dp*dp - dd*(pp - this.raggio*this.raggio);
+        console.log("delta = ", delta);
+
         if(delta >= 0){
-            var t1 = (-ddotp + Math.sqrt(delta)) / dsquare;
-            var t2 = (-ddotp - Math.sqrt(delta)) / dsquare;
+            var t1 = (-dp + Math.sqrt(delta)) / dd;
+            var t2 = (-dp - Math.sqrt(delta)) / dd;
 
             if(t1 > 0 && t1 < t2){
                 return t1;
-            }else{
+            }
+            if(t2 > 0 && t2 < t1){
                 return t2;
+            }else{
+                console.log("return false 1");
+                console.log("t1 = ", t1);
+                console.log("t2 = ", t2);
+                return false;//sfera dietro la camera
+            }
+        }else{
+            console.log("return false 2");
+            return false;
+        }
+    }
+    this.intersect = function(ray){//Implementa formula sulle slide del prof
+        var p = glMatrix.vec3.subtract([], ray.p, this.centro);//glMatrix.vec3.transformMat4([], this.centro, this.trasformate) ); //e - c
+
+        var dp = glMatrix.vec3.dot(ray.dir,p);
+        var pp = glMatrix.vec3.dot(p, p);
+        var dd = glMatrix.vec3.dot(ray.dir, ray.dir);
+
+        var delta = dp*dp - dd*(pp - this.raggio*this.raggio);
+        if(delta >= 0){
+            var t1 = (-dp + Math.sqrt(delta)) / dd;
+            var t2 = (-dp - Math.sqrt(delta)) / dd;
+
+            if(t1 > 0 && t1 < t2){
+                return t1;
+            }
+            if(t2 > 0 && t2 < t1){
+                return t2;
+            }else{
+                return false;//sfera dietro la camera
             }
         }else{
             return false;
@@ -81,7 +124,8 @@ var Sphere = function(centro, raggio, materiale){
     }
 
     this.hitSurface = function(ray){ //wrapper per debug
-        var r = new Ray( glMatrix.vec3.transformMat4([], ray.p, this.trasformateI), glMatrix.vec3.transformMat4([], ray.dir, this.trasformateI) );
+        var r = new Ray( glMatrix.vec3.transformMat4([], ray.p, this.trasformateI),
+                         glMatrix.vec3.transformMat4([], ray.dir, this.trasformateI) );
         return this.intersect(r);
     }
 
@@ -117,12 +161,12 @@ var Sphere = function(centro, raggio, materiale){
     }
 
     this.getNormal = function(point){
-        return glMatrix.vec3.normalize([], glMatrix.vec3.subtract([], point, this.centro) );
+        return glMatrix.vec3.normalize([], glMatrix.vec3.subtract([], point, glMatrix.vec3.transformMat4([], this.centro, this.trasformate) ) );
     }
 
     this.shadeP = function(ray, point, normale, light){//luce puntiforme
         //lambert
-        var l = glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point) );
+        var l = glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point ) );
         var temp = glMatrix.vec3.dot(l, normale);
         var colore = [0, 0, 0];
         if( Math.max(0, temp) ){
@@ -272,8 +316,6 @@ function loadSceneFile(filepath){
         // if (scene.surfaces[i].shape == "Triangle") {
         //     surfaces.push(new Triangle(scene.surfaces[i].p1, scene.surfaces[i].p2, scene.surfaces[i].p3, scene.surfaces[i].material));
         // }
-
-
     }
 
     for(var i = 0; i < scene.materials.length; i++){
@@ -354,6 +396,7 @@ function render(){
     console.log("la: ", la );
     console.log("directionalLight: ", directionalLight);
     console.log("pointLight: ", pointLight);
+    console.log("centro: ", glMatrix.vec3.transformMat4([], surfaces[0].centro, surfaces[0].trasformate) );
     // var point = ray.pointAtParameter( t );
     // var normale = surfaces[temp2].getNormal(point);
     // console.log(surfaces[temp2].shade(ray, point, normale, pointLight[0]));
@@ -410,7 +453,10 @@ $(document).ready(function(){
         w = h * aspect;
         u = (w*x/(canvas.width-1)) - w/2.0;
         v = (-h*y/(canvas.height-1)) + h/2.0;
-        camera.castRay(u,v); //cast a ray through the point
+        var ray = camera.castRay(u,v); //cast a ray through the point
+        console.log("ray = ", ray);
+        var t = surfaces[0].hitSurface2(ray);
+        console.log("t = ", t);
         DEBUG = false;
     });
 
