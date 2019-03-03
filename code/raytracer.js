@@ -58,8 +58,8 @@ var Sphere = function(centro, raggio, materiale){
     this.raggio2 = raggio*raggio;
     this.materiale = materiale;
     this.trasformate = glMatrix.mat4.create();
-    this.trasformateI = glMatrix.mat4.create();
-    this.trasformateIT = glMatrix.mat4.create();
+    this.trasformateI = glMatrix.mat4.invert([], this.trasformate);
+    this.trasformateIT = glMatrix.mat4.transpose([], this.trasformateI);;
     console.log("sfera inserita");
     console.log("sfera", this.centro);
 
@@ -189,8 +189,8 @@ var Sphere = function(centro, raggio, materiale){
         // return glMatrix.vec3.normalize([],
         //           glMatrix.vec3.transformMat4([],
         //                   glMatrix.vec3.subtract([], point, this.centro), glMatrix.mat4.transpose([], this.trasformateI)));
-        var temp = glMatrix.vec3.subtract([], point, this.centro);
-        glMatrix.mat4.multiply( temp, this.trasformateIT, [point[0], point[1], point[2], 0] );
+        var temp = glMatrix.vec3.subtract([], point, this.centro );
+        glMatrix.mat4.multiply( temp, this.trasformateIT, [temp[0], temp[1], temp[2], 0] );
         return glMatrix.vec3.normalize([], glMatrix.vec3.fromValues(temp[0], temp[1], temp[2]) );
     }
 }
