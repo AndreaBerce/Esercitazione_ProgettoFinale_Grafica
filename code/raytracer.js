@@ -131,13 +131,8 @@ var Sphere = function(centro, raggio, materiale){
     }
 
     this.hitSurface = function(ray){ //wrapper per debug
-        // var r = new Ray( glMatrix.vec3.transformMat4([], ray.p, this.trasformateI),
-        //                  glMatrix.vec3.transformMat4([], ray.dir, this.trasformateI) );
-        // return this.intersect(r);
-        // var temp = Vector4.fromValues(ray.p[0], ray.p[1], ray.p[2], 1);
         var temp = glMatrix.mat4.multiply([], this.trasformateI, [ray.p[0], ray.p[1], ray.p[2], 1]);
         var temp2 = glMatrix.mat4.multiply([], this.trasformateI, [ray.dir[0], ray.dir[1], ray.dir[2], 0]);
-        // return this.intersect(new Ray( [temp[0], temp[1], temp[2]], [temp2[0], temp2[1], temp2[2]] ));
         return new Ray( [temp[0], temp[1], temp[2]], [temp2[0], temp2[1], temp2[2]] );
     }
 
@@ -146,9 +141,6 @@ var Sphere = function(centro, raggio, materiale){
         glMatrix.mat4.translate(this.trasformate, this.trasformate, vettore);
         glMatrix.mat4.invert(this.trasformateI, this.trasformate);
         glMatrix.mat4.transpose(this.trasformateIT, this.trasformateI);
-        // glMatrix.vec3.add(this.centro, this.centro, vettore);
-        // console.log("centro: ", this.centro);
-        // console.log("traslazione: ", this.trasformate, this.trasformateI);
     }
 
     this.rotazione = function(vettore){
@@ -181,14 +173,6 @@ var Sphere = function(centro, raggio, materiale){
     }
 
     this.getNormal = function(point){
-        // return glMatrix.vec3.normalize([],
-        //           glMatrix.vec3.subtract([], point,
-        //               // this.centro) );
-        //               glMatrix.vec3.transformMat4([], this.centro,
-        //                   glMatrix.mat4.transpose([], this.trasformateI) ) ) );
-        // return glMatrix.vec3.normalize([],
-        //           glMatrix.vec3.transformMat4([],
-        //                   glMatrix.vec3.subtract([], point, this.centro), glMatrix.mat4.transpose([], this.trasformateI)));
         var temp = glMatrix.vec3.subtract([], point, this.centro );
         glMatrix.mat4.multiply( temp, this.trasformateIT, [temp[0], temp[1], temp[2], 0] );
         return glMatrix.vec3.normalize([], glMatrix.vec3.fromValues(temp[0], temp[1], temp[2]) );
@@ -256,37 +240,20 @@ function shadeA(materiale, k){
 }
 
 
-
-
 function shadeP(ray, point, normale, light, materiale){//luce puntiforme
     //lambert
-    var l = glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point ) );
-    var temp = glMatrix.vec3.dot(l, normale);
-    var colore = [0, 0, 0];
-    if( Math.max(0, temp) ){
-        colore = [materials[materiale].kd[0] * light.colore[0] * temp,
-                  materials[materiale].kd[1] * light.colore[1] * temp,
-                  materials[materiale].kd[2] * light.colore[2] * temp];
-    }
-    //Phong
-    var v = glMatrix.vec3.normalize([], glMatrix.vec3.scale([], ray.dir, -1));
-    temp = 2 * glMatrix.vec3.dot(l, normale);
-    var r = [temp * normale[0] - l[0],
-             temp * normale[1] - l[1],
-             temp * normale[2] - l[2]];
-    var temp = glMatrix.vec3.dot(r, v);
-    if( Math.max(temp, 0) ){
-        temp = Math.pow(temp, materials[materiale].shininess);
-        colore = [materials[materiale].ks[0] * light.colore[0] * temp + colore[0],
-                  materials[materiale].ks[1] * light.colore[1] * temp + colore[1],
-                  materials[materiale].ks[2] * light.colore[2] * temp + colore[2]];
-    }
-    return colore;
+    return shadeG(ray, point, normale, light,
+                  glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point ) ),
+                  materiale);
 }
 
 function shadeD(ray, point, normale, light, materiale){//luce direzionale
     //Lambert
-    var l = glMatrix.vec3.normalize([], [-light.direzione[0], -light.direzione[1], -light.direzione[2]]);
+    return shadeG(ray, point, normale, light,
+                  glMatrix.vec3.normalize([], [-light.direzione[0], -light.direzione[1], -light.direzione[2]]),
+                  materiale);
+}
+function shadeG(ray, point, normale, light, l, materiale){
     var temp = glMatrix.vec3.dot(l, normale);
     var colore = [0,0,0];
     if( Math.max(0, temp) ){
