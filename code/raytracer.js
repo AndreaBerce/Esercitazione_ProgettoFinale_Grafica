@@ -55,27 +55,33 @@ var Camera = function(eye, up, at){
 var Sphere = function(centro, raggio, materiale){
     this.centro = centro;//glMatrix.vec3.fromValues(centro[0], centro[1], centro[2]);
     this.raggio = raggio;
+    this.raggio2 = raggio*raggio;
     this.materiale = materiale;
     this.trasformate = glMatrix.mat4.create();
     this.trasformateI = glMatrix.mat4.create();
+    this.trasformateIT = glMatrix.mat4.create();
     console.log("sfera inserita");
     console.log("sfera", this.centro);
 
     this.hitSurface2 = function(ray){ //wrapper per debug
-        var r = new Ray( glMatrix.vec3.transformMat4([], ray.p, this.trasformateI),
-                         glMatrix.vec3.transformMat4([], ray.dir, this.trasformateI) );
-        return this.intersect2(r);
+        // var r = new Ray( glMatrix.vec3.transformMat4([], ray.p, this.trasformateI),
+        //                  glMatrix.vec3.transformMat4([], ray.dir, this.trasformateI) );
+        // return this.intersect2(r);
+        var temp = glMatrix.mat4.multiply([], this.trasformateI, [ray.p[0], ray.p[1], ray.p[2], 1]);
+        var temp2 = glMatrix.mat4.multiply([], this.trasformateI, [ray.dir[0], ray.dir[1], ray.dir[2], 0]);
+        return this.intersect(new Ray( [temp[0], temp[1], temp[2]], [temp2[0], temp2[1], temp2[2]] ));
     }
     this.intersect2 = function(ray){
         console.log("centro1: ", this.centro);
         console.log("centro2: ", glMatrix.vec3.transformMat4([], this.centro, this.trasformate) );
-        var p = glMatrix.vec3.subtract([], ray.p, this.centro);
+        var p = glMatrix.vec3.subtract([], ray.p, this.centro);//glMatrix.vec3.transformMat4([], this.centro, this.trasformate) ); //e - c
+        // var p = glMatrix.vec3.subtract([], ray.p, glMatrix.vec3.transformMat4([], this.centro, this.trasformate) );
 
         var dp = glMatrix.vec3.dot(ray.dir,p);
         var pp = glMatrix.vec3.dot(p, p);
         var dd = glMatrix.vec3.dot(ray.dir, ray.dir);
 
-        var delta = dp*dp - dd*(pp - this.raggio*this.raggio);
+        var delta = dp*dp - dd*(pp - this.raggio2);
         console.log("delta = ", delta);
 
         if(delta >= 0){
@@ -100,12 +106,13 @@ var Sphere = function(centro, raggio, materiale){
     }
     this.intersect = function(ray){//Implementa formula sulle slide del prof
         var p = glMatrix.vec3.subtract([], ray.p, this.centro);//glMatrix.vec3.transformMat4([], this.centro, this.trasformate) ); //e - c
+        // var p = glMatrix.vec3.subtract([], ray.p, glMatrix.vec3.transformMat4([], this.centro, this.trasformate) );
 
         var dp = glMatrix.vec3.dot(ray.dir,p);
         var pp = glMatrix.vec3.dot(p, p);
         var dd = glMatrix.vec3.dot(ray.dir, ray.dir);
 
-        var delta = dp*dp - dd*(pp - this.raggio*this.raggio);
+        var delta = dp*dp - dd*(pp - this.raggio2);
         if(delta >= 0){
             var t1 = (-dp + Math.sqrt(delta)) / dd;
             var t2 = (-dp - Math.sqrt(delta)) / dd;
@@ -124,16 +131,22 @@ var Sphere = function(centro, raggio, materiale){
     }
 
     this.hitSurface = function(ray){ //wrapper per debug
-        var r = new Ray( glMatrix.vec3.transformMat4([], ray.p, this.trasformateI),
-                         glMatrix.vec3.transformMat4([], ray.dir, this.trasformateI) );
-        return this.intersect(r);
+        // var r = new Ray( glMatrix.vec3.transformMat4([], ray.p, this.trasformateI),
+        //                  glMatrix.vec3.transformMat4([], ray.dir, this.trasformateI) );
+        // return this.intersect(r);
+        // var temp = Vector4.fromValues(ray.p[0], ray.p[1], ray.p[2], 1);
+        var temp = glMatrix.mat4.multiply([], this.trasformateI, [ray.p[0], ray.p[1], ray.p[2], 1]);
+        var temp2 = glMatrix.mat4.multiply([], this.trasformateI, [ray.dir[0], ray.dir[1], ray.dir[2], 0]);
+        // return this.intersect(new Ray( [temp[0], temp[1], temp[2]], [temp2[0], temp2[1], temp2[2]] ));
+        return new Ray( [temp[0], temp[1], temp[2]], [temp2[0], temp2[1], temp2[2]] );
     }
 
     this.traslazione = function(vettore){
         console.log("traslazione sfera");
-        // glMatrix.mat4.translate(this.trasformate, this.trasformate, vettore);
-        // glMatrix.mat4.invert(this.trasformateI, this.trasformate);
-        glMatrix.vec3.add(this.centro, this.centro, vettore);
+        glMatrix.mat4.translate(this.trasformate, this.trasformate, vettore);
+        glMatrix.mat4.invert(this.trasformateI, this.trasformate);
+        glMatrix.mat4.transpose(this.trasformateIT, this.trasformateI);
+        // glMatrix.vec3.add(this.centro, this.centro, vettore);
         // console.log("centro: ", this.centro);
         // console.log("traslazione: ", this.trasformate, this.trasformateI);
     }
@@ -150,6 +163,7 @@ var Sphere = function(centro, raggio, materiale){
             glMatrix.mat4.rotateZ(this.trasformate, this.trasformate, rad(vettore[2]) );
         }
         glMatrix.mat4.invert(this.trasformateI, this.trasformate);
+        glMatrix.mat4.transpose(this.trasformateIT, this.trasformateI);
         console.log("rotazione: ", this.trasformate, this.trasformateI);
     }
 
@@ -157,16 +171,32 @@ var Sphere = function(centro, raggio, materiale){
         console.log("scala sfera");
         glMatrix.mat4.scale(this.trasformate, this.trasformate, vettore);
         glMatrix.mat4.invert(this.trasformateI, this.trasformate);
+        glMatrix.mat4.transpose(this.trasformateIT, this.trasformateI);
         console.log("scalatura: ", this.trasformate, this.trasformateI);
     }
 
+    this.trasformation_point = function(point){
+        var temp = glMatrix.mat4.multiply([], this.trasformate, [point[0], point[1], point[2], 1]);
+        return glMatrix.vec3.fromValues(temp[0], temp[1], temp[2]);
+    }
+
     this.getNormal = function(point){
-        return glMatrix.vec3.normalize([],
-                  glMatrix.vec3.subtract([], point,
-                      glMatrix.vec3.transformMat4([], this.centro,
-                          glMatrix.mat4.transpose([], this.trasformateI) ) ) );
+        // return glMatrix.vec3.normalize([],
+        //           glMatrix.vec3.subtract([], point,
+        //               // this.centro) );
+        //               glMatrix.vec3.transformMat4([], this.centro,
+        //                   glMatrix.mat4.transpose([], this.trasformateI) ) ) );
+        // return glMatrix.vec3.normalize([],
+        //           glMatrix.vec3.transformMat4([],
+        //                   glMatrix.vec3.subtract([], point, this.centro), glMatrix.mat4.transpose([], this.trasformateI)));
+        var temp = glMatrix.vec3.subtract([], point, this.centro);
+        glMatrix.mat4.multiply( temp, this.trasformateIT, [point[0], point[1], point[2], 0] );
+        return glMatrix.vec3.normalize([], glMatrix.vec3.fromValues(temp[0], temp[1], temp[2]) );
     }
 }
+
+
+
 
 var Triangle = function(p1, p2, p3, materiale){
     this.a = p1;
@@ -218,6 +248,14 @@ var Triangle = function(p1, p2, p3, materiale){
         return glMatrix.vec3.normalize([], temp1);
     }
 }
+
+function shadeA(materiale, k){
+    return glMatrix.vec3.fromValues(materials[materiale].ka[0] * ambientLight[k].colore[0],
+                                    materials[materiale].ka[1] * ambientLight[k].colore[1],
+                                    materials[materiale].ka[2] * ambientLight[k].colore[2]);
+}
+
+
 
 
 function shadeP(ray, point, normale, light, materiale){//luce puntiforme
@@ -273,6 +311,8 @@ function shadeD(ray, point, normale, light, materiale){//luce direzionale
 }
 
 
+
+
 //Ray-Intersect
 var Ray = function(p, dir){
     this.p = p; //origine
@@ -281,10 +321,6 @@ var Ray = function(p, dir){
     this.pointAtParameter = function( t ){//return A + t * d
         return glMatrix.vec3.add([], this.p, glMatrix.vec3.scale([], this.dir, t));
     }
-}
-
-var Intersection = function(x, y, z){
-    this.int = new glMatrix.vec3(x, y, z);
 }
 
 //Lighting
@@ -377,6 +413,7 @@ function loadSceneFile(filepath){
         }
         if( scene.lights[i].source == "Point" ){
             pointLight.push( new PointLight(scene.lights[i].color, scene.lights[i].position) );
+            console.log("luce puntiforme: ", scene.lights[i]);
         }
         if( scene.lights[i].source == "Directional" ){
             directionalLight.push( new DirectionalLight(scene.lights[i].color, scene.lights[i].direction) );
@@ -402,49 +439,52 @@ function render(){
             //TODO - fire a ray though each pixel
             var ray = camera.castRay(u, v);
 
-            var t = false;
+            var t_min = false;
+            var temp_ray;
             var temp = false;
-            var temp2;
+            var k_min;
+            var ray_min;
             //console.log("surfaces.length = ", surfaces.length);
             for( var k = 0; k < surfaces.length; k++ ){
                 //calculate the intersection of that ray with the scene
-                temp = surfaces[k].hitSurface(ray);
-                if( temp != false && ( temp < t || t == false) ){
-                    t = temp;
-                    temp2 = k;
+                temp_ray = surfaces[k].hitSurface(ray);
+                temp = surfaces[k].intersect(temp_ray);
+                if( temp != false && ( temp < t_min || t_min == false) ){
+                    t_min = temp;
+                    k_min = k;
+                    ray_min = temp_ray;
                 }
             }
             //set the pixel to be the color of that intersection (using setPixel() method)
-            if(t == false){
+            if(t_min == false){
                 setPixel(i, j, backgroundcolor);
             }
             else{
-                var point = ray.pointAtParameter( t );
-                var normale = surfaces[temp2].getNormal(point);
-                // surfaces[temp2].shade(ray, point, normale, pointLight[0])
+                var point = ray_min.pointAtParameter( t_min );
+                var point_transform = surfaces[k_min].trasformation_point(point);
+                var normale = surfaces[k_min].getNormal(point);
+                // var point_transform = point;
                 var l = glMatrix.vec3.create();
                 for( var k = 0; k < ambientLight.length; k++ ){
-                    l[0] = l[0] + materials[surfaces[temp2].materiale].ka[0] * ambientLight[k].colore[0];
-                    l[1] = l[1] + materials[surfaces[temp2].materiale].ka[1] * ambientLight[k].colore[1];
-                    l[2] = l[2] + materials[surfaces[temp2].materiale].ka[2] * ambientLight[k].colore[2];
+                    glMatrix.vec3.add( l, l, shadeA( surfaces[k_min].materiale, k ) );
                 }
                 for( var k = 0; k < directionalLight.length; k++ ){
-                    glMatrix.vec3.add( l, l, shadeD( ray, point, normale, directionalLight[k], surfaces[temp2].materiale ) );
+                    glMatrix.vec3.add( l, l, shadeD( ray_min, point_transform, normale, directionalLight[k], surfaces[k_min].materiale ) );
                 }
                 for( var k = 0; k < pointLight.length; k++ ){
-                    glMatrix.vec3.add( l, l, shadeP( ray, point, normale, pointLight[k], surfaces[temp2].materiale ) );
+                    glMatrix.vec3.add( l, l, shadeP( ray_min, point_transform, normale, pointLight[k], surfaces[k_min].materiale ) );
                 }
                 setPixel(i, j, l);
             }
         }
     }
-    var la = glMatrix.vec3.create();
-    la[0] = la[0] + materials[surfaces[0].materiale].ka[0] * ambientLight[0].colore[0];
-    la[1] = la[1] + materials[surfaces[0].materiale].ka[1] * ambientLight[0].colore[1];
-    la[2] = la[2] + materials[surfaces[0].materiale].ka[2] * ambientLight[0].colore[2];
-    console.log("la: ", la );
-    console.log("directionalLight: ", directionalLight);
-    console.log("pointLight: ", pointLight);
+    // var la = glMatrix.vec3.create();
+    // la[0] = la[0] + materials[surfaces[0].materiale].ka[0] * ambientLight[0].colore[0];
+    // la[1] = la[1] + materials[surfaces[0].materiale].ka[1] * ambientLight[0].colore[1];
+    // la[2] = la[2] + materials[surfaces[0].materiale].ka[2] * ambientLight[0].colore[2];
+    // console.log("la: ", la );
+    // console.log("directionalLight: ", directionalLight);
+    // console.log("pointLight: ", pointLight);
     // console.log("centro: ", glMatrix.vec3.transformMat4([], surfaces[0].centro, surfaces[0].trasformate) );
     // var point = ray.pointAtParameter( t );
     // var normale = surfaces[temp2].getNormal(point);
@@ -504,9 +544,21 @@ $(document).ready(function(){
         v = (-h*y/(canvas.height-1)) + h/2.0;
         var ray = camera.castRay(u,v); //cast a ray through the point
         console.log("ray = ", ray);
-        var t = surfaces[0].hitSurface2(ray);
+        // var t = surfaces[0].hitSurface2(ray);
+        // console.log("t = ", t);
+        var ray_transform = surfaces[0].hitSurface(ray);
+        console.log("ray_transform = ", ray_transform);
+        var t = surfaces[0].intersect(ray_transform);
         console.log("t = ", t);
+        var point = ray_transform.pointAtParameter( t );
+        console.log("point = ", point);
+        var point_transform = surfaces[0].trasformation_point(point);
+        console.log("point_transform = ", point_transform);
+        var normale = surfaces[0].getNormal(point);
+        console.log("normale = ", normale);
+        console.log("shade = ", shadeP( ray_transform, point_transform, normale, pointLight[0], surfaces[0].materiale ) );
         DEBUG = false;
     });
+
 
 });
