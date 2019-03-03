@@ -288,7 +288,6 @@ var Ray = function(p, dir){
 //Lighting
 var AmbientLight = function(colore){
     this.colore = colore;
-    console.log("luce ambientale: ", colore);
 }
 
 var PointLight = function(colore, punto){
@@ -299,7 +298,6 @@ var PointLight = function(colore, punto){
 var DirectionalLight = function(colore, direzione){
     this.colore = colore;
     this.direzione = direzione;
-    console.log("luce dirzionale: ", direzione);
 }
 
 var Material = function(ka, kd, ks, shininess, kr){
@@ -308,7 +306,6 @@ var Material = function(ka, kd, ks, shininess, kr){
     this.ks = ks;
     this.shininess = shininess;
     this.kr = kr;
-    console.log("shininess: ", shininess);
 }
 
 
