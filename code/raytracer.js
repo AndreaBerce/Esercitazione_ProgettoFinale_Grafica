@@ -187,6 +187,9 @@ var Triangle = function(p1, p2, p3, materiale){
     this.b = p2;
     this.c = p3;
     this.materiale = materiale;
+    this.trasformate = glMatrix.mat4.create();
+    this.trasformateI = glMatrix.mat4.invert([], this.trasformate);
+    this.trasformateIT = glMatrix.mat4.transpose([], this.trasformateI);;
 
     this.intersect = function(ray){
         var ab = glMatrix.vec3.subtract([], this.a, this.b);
@@ -222,7 +225,46 @@ var Triangle = function(p1, p2, p3, materiale){
     this.hitSurface = function(ray){ //wrapper per debug
         // var r = new Ray( glMatrix.vec3.transformMat4([], ray.p, this.trasformateI),
         //                  glMatrix.vec3.transformMat4([], ray.dir, this.trasformateI) );
-        return this.intersect(ray);
+        // return this.intersect(ray);
+        var temp = glMatrix.mat4.multiply([], this.trasformateI, [ray.p[0], ray.p[1], ray.p[2], 1]);
+        var temp2 = glMatrix.mat4.multiply([], this.trasformateI, [ray.dir[0], ray.dir[1], ray.dir[2], 0]);
+        return new Ray( [temp[0], temp[1], temp[2]], [temp2[0], temp2[1], temp2[2]] );
+    }
+
+    this.traslazione = function(vettore){
+        console.log("traslazione sfera");
+        glMatrix.mat4.translate(this.trasformate, this.trasformate, vettore);
+        glMatrix.mat4.invert(this.trasformateI, this.trasformate);
+        glMatrix.mat4.transpose(this.trasformateIT, this.trasformateI);
+    }
+
+    this.rotazione = function(vettore){
+        console.log("rotazione sfera");
+        if( vettore[0] != 0 ){
+            glMatrix.mat4.rotateX(this.trasformate, this.trasformate, rad(vettore[0]) );
+        }
+        if( vettore[1] != 0 ){
+            glMatrix.mat4.rotateY(this.trasformate, this.trasformate, rad(vettore[1]) );
+        }
+        if( vettore[2] != 0 ){
+            glMatrix.mat4.rotateZ(this.trasformate, this.trasformate, rad(vettore[2]) );
+        }
+        glMatrix.mat4.invert(this.trasformateI, this.trasformate);
+        glMatrix.mat4.transpose(this.trasformateIT, this.trasformateI);
+        console.log("rotazione: ", this.trasformate, this.trasformateI);
+    }
+
+    this.scala = function(vettore){
+        console.log("scala sfera");
+        glMatrix.mat4.scale(this.trasformate, this.trasformate, vettore);
+        glMatrix.mat4.invert(this.trasformateI, this.trasformate);
+        glMatrix.mat4.transpose(this.trasformateIT, this.trasformateI);
+        console.log("scalatura: ", this.trasformate, this.trasformateI);
+    }
+
+    this.trasformation_point = function(point){
+        var temp = glMatrix.mat4.multiply([], this.trasformate, [point[0], point[1], point[2], 1]);
+        return glMatrix.vec3.fromValues(temp[0], temp[1], temp[2]);
     }
 
     this.getNormal = function(point){
@@ -349,24 +391,24 @@ function loadSceneFile(filepath){
         console.log("i = ", i);
         if (scene.surfaces[i].shape == "Sphere") {
             surfaces.push( new Sphere(scene.surfaces[i].center, scene.surfaces[i].radius, scene.surfaces[i].material) );
-
-            if( scene.surfaces[i].hasOwnProperty('transforms') ){
-                for( var j = 0; j < (scene.surfaces[i].transforms.length); j++ ){
-                    console.log("trasformata: ", j);
-                    if( scene.surfaces[i].transforms[j][0] == "Translate" ){
-                        surfaces[i].traslazione( scene.surfaces[i].transforms[j][1] );
-                    }
-                    if( scene.surfaces[i].transforms[j][0] == "Rotate" ){
-                        surfaces[i].rotazione( scene.surfaces[i].transforms[j][1] );
-                    }
-                    if( scene.surfaces[i].transforms[j][0] == "Scale" ){
-                        surfaces[i].scala( scene.surfaces[i].transforms[j][1] );
-                    }
-                }
-            }
         }
         if (scene.surfaces[i].shape == "Triangle") {
             surfaces.push(new Triangle(scene.surfaces[i].p1, scene.surfaces[i].p2, scene.surfaces[i].p3, scene.surfaces[i].material));
+        }
+        
+        if( scene.surfaces[i].hasOwnProperty('transforms') ){
+            for( var j = 0; j < (scene.surfaces[i].transforms.length); j++ ){
+                console.log("trasformata: ", j);
+                if( scene.surfaces[i].transforms[j][0] == "Translate" ){
+                    surfaces[i].traslazione( scene.surfaces[i].transforms[j][1] );
+                }
+                if( scene.surfaces[i].transforms[j][0] == "Rotate" ){
+                    surfaces[i].rotazione( scene.surfaces[i].transforms[j][1] );
+                }
+                if( scene.surfaces[i].transforms[j][0] == "Scale" ){
+                    surfaces[i].scala( scene.surfaces[i].transforms[j][1] );
+                }
+            }
         }
     }
 
