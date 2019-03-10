@@ -248,28 +248,43 @@ function shadeD(ray, point, normale, light, materiale){//luce direzionale
 
 
 function shadeG(ray, point, normale, light, l, materiale){
-    //Lambert
-    var temp = glMatrix.vec3.dot(l, normale);
-    var colore = [0,0,0];
-    if( Math.max(0, temp) ){
-        colore = [materials[materiale].kd[0] * light.colore[0] * temp,
-                  materials[materiale].kd[1] * light.colore[1] * temp,
-                  materials[materiale].kd[2] * light.colore[2] * temp];
+    // ombra, verifico che non esistano superfici tra il punto e la luce
+    var r = new Ray(point, l);
+    var temp_ray, temp, t_min = false;
+    for( var k = 0; k < surfaces.length; k++ ){
+        //calculate the intersection of that ray with the scene
+        temp_ray = surfaces[k].hitSurface(r);
+        temp = surfaces[k].intersect(temp_ray);
+        if( temp != false ){
+            t_min = temp;
+        }
     }
-    //Phong
-    var v = glMatrix.vec3.normalize([], glMatrix.vec3.scale([], ray.dir, -1));
-    temp = 2 * glMatrix.vec3.dot(l, normale);
-    var r = [temp * normale[0] - l[0],
-             temp * normale[1] - l[1],
-             temp * normale[2] - l[2]];
-    temp = glMatrix.vec3.dot(r, v);
-    if( Math.max(temp, 0) ){
-        temp = Math.pow(temp, materials[materiale].shininess);
-        colore = [materials[materiale].ks[0] * light.colore[0] * temp + colore[0],
-                  materials[materiale].ks[1] * light.colore[1] * temp + colore[1],
-                  materials[materiale].ks[2] * light.colore[2] * temp + colore[2]];
+    if(t_min != false){ // ombra
+        return [0,0,0];
+    }else{  // nessuna ombra
+        //Lambert
+        var temp = glMatrix.vec3.dot(l, normale);
+        var colore = [0,0,0];
+        if( Math.max(0, temp) ){
+            colore = [materials[materiale].kd[0] * light.colore[0] * temp,
+                      materials[materiale].kd[1] * light.colore[1] * temp,
+                      materials[materiale].kd[2] * light.colore[2] * temp];
+        }
+        //Phong
+        var v = glMatrix.vec3.normalize([], glMatrix.vec3.scale([], ray.dir, -1));
+        temp = 2 * glMatrix.vec3.dot(l, normale);
+        var r = [temp * normale[0] - l[0],
+                 temp * normale[1] - l[1],
+                 temp * normale[2] - l[2]];
+        temp = glMatrix.vec3.dot(r, v);
+        if( Math.max(temp, 0) ){
+            temp = Math.pow(temp, materials[materiale].shininess);
+            colore = [materials[materiale].ks[0] * light.colore[0] * temp + colore[0],
+                      materials[materiale].ks[1] * light.colore[1] * temp + colore[1],
+                      materials[materiale].ks[2] * light.colore[2] * temp + colore[2]];
+        }
+        return colore;
     }
-    return colore;
 }
 
 
@@ -414,6 +429,7 @@ function render(){
                     ray_min = temp_ray;
                 }
             }
+
             //set the pixel to be the color of that intersection (using setPixel() method)
             if(t_min == false){
                 setPixel(i, j, backgroundcolor);
