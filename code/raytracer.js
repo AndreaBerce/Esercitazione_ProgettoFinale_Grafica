@@ -21,9 +21,9 @@ var filename = "assets/SphereTest.json";
 
 //CLASSES PROTOTYPES
 var Camera = function(eye, up, at){
-    this.eye = glMatrix.vec3.fromValues(eye[0], eye[1], eye[2]);   // Posizione della camera  (e)
-    this.up = glMatrix.vec3.fromValues(up[0], up[1], up[2]);     // Inclinazione testa        (t)
-    this.at = glMatrix.vec3.fromValues(at[0], at[1], at[2]);     // Direzione dello sguardo   (g)
+    this.eye = glMatrix.vec3.fromValues(eye[0], eye[1], eye[2]);    // Posizione della camera  (e)
+    this.up = glMatrix.vec3.fromValues(up[0], up[1], up[2]);        // Inclinazione testa        (t)
+    this.at = glMatrix.vec3.fromValues(at[0], at[1], at[2]);        // Direzione dello sguardo   (g)
 
     //Ricavo il camera frame {u,v,w} dai vettori eye,at,up (lezione 8, slide 19)
     this.w = glMatrix.vec3.scale([], glMatrix.vec3.normalize([], this.at), -1);
@@ -53,7 +53,7 @@ var Camera = function(eye, up, at){
 
 //Surfaces
 var Sphere = function(centro, raggio, materiale){
-    this.centro = centro;//glMatrix.vec3.fromValues(centro[0], centro[1], centro[2]);
+    this.centro = centro;
     this.raggio = raggio;
     this.raggio2 = raggio*raggio;
     this.materiale = materiale;
@@ -64,9 +64,7 @@ var Sphere = function(centro, raggio, materiale){
     console.log("sfera", this.centro);
 
     this.intersect = function(ray){//Implementa formula sulle slide del prof
-        var p = glMatrix.vec3.subtract([], ray.p, this.centro);//glMatrix.vec3.transformMat4([], this.centro, this.trasformate) ); //e - c
-        // var p = glMatrix.vec3.subtract([], ray.p, glMatrix.vec3.transformMat4([], this.centro, this.trasformate) );
-
+        var p = glMatrix.vec3.subtract([], ray.p, this.centro); //e - c
         var dp = glMatrix.vec3.dot(ray.dir,p);
         var pp = glMatrix.vec3.dot(p, p);
         var dd = glMatrix.vec3.dot(ray.dir, ray.dir);
@@ -289,6 +287,61 @@ function shadeG(ray, point, normale, light, l, materiale){
 
 
 
+function trace(ray, nRiflessioni){
+    var t_min = false;
+    var temp_ray;
+    var temp = false;
+    var k_min;
+    var ray_min;
+    //console.log("surfaces.length = ", surfaces.length);
+    for( var k = 0; k < surfaces.length; k++ ){
+        //calculate the intersection of that ray with the scene
+        temp_ray = surfaces[k].hitSurface(ray);
+        temp = surfaces[k].intersect(temp_ray);
+        if( temp != false && ( temp < t_min || t_min == false) ){
+            t_min = temp;
+            k_min = k;
+            ray_min = temp_ray;
+        }
+    }
+
+    //set the pixel to be the color of that intersection (using setPixel() method)
+    if(t_min == false){
+        return [0,0,0];
+    }
+    else{
+        var point = ray_min.pointAtParameter( t_min );
+        var point_transform = surfaces[k_min].trasformation_point(point);
+        var normale = surfaces[k_min].getNormal(point);
+        var l = glMatrix.vec3.create();
+        for( var k = 0; k < ambientLight.length; k++ ){
+            glMatrix.vec3.add( l, l, shadeA( surfaces[k_min].materiale, k ) );
+        }
+        for( var k = 0; k < directionalLight.length; k++ ){
+            glMatrix.vec3.add( l, l, shadeD( ray_min, point_transform, normale, directionalLight[k], surfaces[k_min].materiale ) );
+        }
+        for( var k = 0; k < pointLight.length; k++ ){
+            glMatrix.vec3.add( l, l, shadeP( ray_min, point_transform, normale, pointLight[k], surfaces[k_min].materiale ) );
+        }
+        if( nRiflessioni > 0 && materials[surfaces[k_min].materiale].kr[0] != 0
+                             && materials[surfaces[k_min].materiale].kr[1] != 0
+                             && materials[surfaces[k_min].materiale].kr[2] != 0 ){
+            var v = glMatrix.vec3.normalize([], glMatrix.vec3.scale([], ray_min.dir, -1));
+            var temp = 2 * glMatrix.vec3.dot(normale, v);
+            var r = new Ray(point_transform,  [temp * normale[0] - v[0],
+                                               temp * normale[1] - v[1],
+                                               temp * normale[2] - v[2]] );
+            v = trace(r , nRiflessioni-1);
+            v = [v[0] * materials[surfaces[k_min].materiale].kr[0],
+                 v[1] * materials[surfaces[k_min].materiale].kr[1],
+                 v[2] * materials[surfaces[k_min].materiale].kr[2]];
+            glMatrix.vec3.add(l, l, v );
+        }
+        return l;
+    }
+}
+
+
 
 //Ray-Intersect
 var Ray = function(p, dir){
@@ -400,7 +453,6 @@ function loadSceneFile(filepath){
 //renders the scene
 function render(){
     var h,w,u,v,s;
-    var backgroundcolor = [0,0,0];
     var start = Date.now(); //for logging
     h = 2*Math.tan(rad(scene.camera.fovy/2.0));
     w = h * aspect;
@@ -412,45 +464,7 @@ function render(){
 
             //TODO - fire a ray though each pixel
             var ray = camera.castRay(u, v);
-
-            var t_min = false;
-            var temp_ray;
-            var temp = false;
-            var k_min;
-            var ray_min;
-            //console.log("surfaces.length = ", surfaces.length);
-            for( var k = 0; k < surfaces.length; k++ ){
-                //calculate the intersection of that ray with the scene
-                temp_ray = surfaces[k].hitSurface(ray);
-                temp = surfaces[k].intersect(temp_ray);
-                if( temp != false && ( temp < t_min || t_min == false) ){
-                    t_min = temp;
-                    k_min = k;
-                    ray_min = temp_ray;
-                }
-            }
-
-            //set the pixel to be the color of that intersection (using setPixel() method)
-            if(t_min == false){
-                setPixel(i, j, backgroundcolor);
-            }
-            else{
-                var point = ray_min.pointAtParameter( t_min );
-                var point_transform = surfaces[k_min].trasformation_point(point);
-                var normale = surfaces[k_min].getNormal(point);
-                // var point_transform = point;
-                var l = glMatrix.vec3.create();
-                for( var k = 0; k < ambientLight.length; k++ ){
-                    glMatrix.vec3.add( l, l, shadeA( surfaces[k_min].materiale, k ) );
-                }
-                for( var k = 0; k < directionalLight.length; k++ ){
-                    glMatrix.vec3.add( l, l, shadeD( ray_min, point_transform, normale, directionalLight[k], surfaces[k_min].materiale ) );
-                }
-                for( var k = 0; k < pointLight.length; k++ ){
-                    glMatrix.vec3.add( l, l, shadeP( ray_min, point_transform, normale, pointLight[k], surfaces[k_min].materiale ) );
-                }
-                setPixel(i, j, l);
-            }
+            setPixel(i, j, trace(ray, scene.bounce_depth) );
         }
     }
     // var la = glMatrix.vec3.create();
