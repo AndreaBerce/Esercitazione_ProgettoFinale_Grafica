@@ -3,17 +3,17 @@
 		"eye" : [0.0, 0.0, 40.0],
 		"up" : [0.0, 1.0, 0.0],
 		"at" : [0.0, 0.0, 9.9],
-		"fovy" : 36.5, "aspect" : 1 
+		"fovy" : 36.5, "aspect" : 1
 	},
 	"bounce_depth" : 1,
 	"shadow_bias" : 0.005,
 
-	"lights" : [ 
+	"lights" : [
 		{"source" : "Ambient", "color" : [0.05,0.05,0.05]},
 		{"source" : "Point", "position" : [0, 9, 0], "color" : [1,1,1]}
 	],
 
-	"materials" : [ 
+	"materials" : [
 		{
 			"name" : "The box",
 			"ka" : [1,1,1],
