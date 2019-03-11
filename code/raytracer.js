@@ -321,9 +321,9 @@ function trace(ray, nRiflessioni){
         for( var k = 0; k < pointLight.length; k++ ){
             glMatrix.vec3.add( l, l, shadeP( ray_min, point_transform, normale, pointLight[k], surfaces[k_min].materiale ) );
         }
-        if( nRiflessioni > 0 && materials[surfaces[k_min].materiale].kr[0] != 0
-                             && materials[surfaces[k_min].materiale].kr[1] != 0
-                             && materials[surfaces[k_min].materiale].kr[2] != 0 ){
+        if( nRiflessioni > 0 && ( materials[surfaces[k_min].materiale].kr[0] != 0
+                                 | materials[surfaces[k_min].materiale].kr[1] != 0
+                                 | materials[surfaces[k_min].materiale].kr[2] != 0 ) ){
             var v = glMatrix.vec3.normalize([], glMatrix.vec3.scale([], ray_min.dir, -1));
             var temp = 2 * glMatrix.vec3.dot(normale, v);
             var r = new Ray(point_transform,  [temp * normale[0] - v[0],
