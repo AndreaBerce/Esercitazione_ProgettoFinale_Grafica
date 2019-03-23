@@ -127,7 +127,7 @@ var Sphere = function(centro, raggio, materiale){
         return glMatrix.vec3.fromValues(temp[0], temp[1], temp[2]);
     }
 
-    this.getNormal = function(point){
+    this.getNormal = function(point, ray){
         var temp = glMatrix.vec3.subtract([], point, this.centro );
         glMatrix.mat4.multiply( temp, this.trasformateIT, [temp[0], temp[1], temp[2], 0] );
         return glMatrix.vec3.normalize([], glMatrix.vec3.fromValues(temp[0], temp[1], temp[2]) );
@@ -163,7 +163,7 @@ var Triangle = function(p1, p2, p3, materiale){
         var gamma = (d[2]*(ab[0]*ae[1] - ae[0]*ab[1]) +
                      d[1]*(ae[0]*ab[2] - ab[0]*ae[2]) +
                      d[0]*(ab[1]*ae[2] - ae[1]*ab[2]) ) / M;
-        if( gamma < 0 ){
+        if( gamma < 0 || gamma > 1 ){
             return false;
         }
         var beta = (ae[0]*(ac[1]*d[2] - d[1]*ac[2]) +
@@ -217,11 +217,17 @@ var Triangle = function(p1, p2, p3, materiale){
         return glMatrix.vec3.fromValues(temp[0], temp[1], temp[2]);
     }
 
-    this.getNormal = function(point){
+    this.getNormal = function(point, ray){
         var temp1 = glMatrix.vec3.subtract([], this.c, this.a);
         var temp2 = glMatrix.vec3.subtract([], this.b, this.a);
         temp1 = glMatrix.vec3.cross([], temp1, temp2);
-        return glMatrix.vec3.normalize([], temp1);
+        //return glMatrix.vec3.normalize([], temp1);
+        glMatrix.vec3.normalize( temp1, temp1);
+        if( glMatrix.vec3.dot( temp1, ray.dir ) > 0 ){
+            glMatrix.vec3.scale( temp1, temp1, -1.0 );
+        }
+        glMatrix.mat4.multiply( temp1, this.trasformateIT, [temp1[0], temp1[1], temp1[2], 0] );
+        return glMatrix.vec3.normalize([], glMatrix.vec3.fromValues(temp1[0], temp1[1], temp1[2]) );
     }
 }
 
@@ -310,7 +316,7 @@ function trace(ray, nRiflessioni){
     else{
         var point = ray_min.pointAtParameter( t_min );
         var point_transform = surfaces[k_min].trasformation_point(point);
-        var normale = surfaces[k_min].getNormal(point);
+        var normale = surfaces[k_min].getNormal(point, ray_min);
         var l = glMatrix.vec3.create();
         for( var k = 0; k < ambientLight.length; k++ ){
             glMatrix.vec3.add( l, l, shadeA( surfaces[k_min].materiale, k ) );
@@ -321,9 +327,9 @@ function trace(ray, nRiflessioni){
         for( var k = 0; k < pointLight.length; k++ ){
             glMatrix.vec3.add( l, l, shadeP( ray_min, point_transform, normale, pointLight[k], surfaces[k_min].materiale ) );
         }
-        if( nRiflessioni > 0 && ( materials[surfaces[k_min].materiale].kr[0] != 0
-                                 | materials[surfaces[k_min].materiale].kr[1] != 0
-                                 | materials[surfaces[k_min].materiale].kr[2] != 0 ) ){
+        if( nRiflessioni > 0 && (   materials[surfaces[k_min].materiale].kr[0] != 0
+                                 || materials[surfaces[k_min].materiale].kr[1] != 0
+                                 || materials[surfaces[k_min].materiale].kr[2] != 0 ) ){
             var v = glMatrix.vec3.normalize([], glMatrix.vec3.scale([], ray_min.dir, -1));
             var temp = 2 * glMatrix.vec3.dot(normale, v);
             var r = new Ray(point_transform,  [temp * normale[0] - v[0],
@@ -519,17 +525,23 @@ $(document).ready(function(){
         v = (-h*y/(canvas.height-1)) + h/2.0;
         var ray = camera.castRay(u,v); //cast a ray through the point
         console.log("ray = ", ray);
-        var ray_transform = surfaces[0].hitSurface(ray);
+
+        var k = 0;
+        var ray_transform = surfaces[k].hitSurface(ray);
         console.log("ray_transform = ", ray_transform);
-        var t = surfaces[0].intersect(ray_transform);
+        var t = surfaces[k].intersect(ray_transform);
         console.log("t = ", t);
         var point = ray_transform.pointAtParameter( t );
         console.log("point = ", point);
-        var point_transform = surfaces[0].trasformation_point(point);
+        var point_transform = surfaces[k].trasformation_point(point);
         console.log("point_transform = ", point_transform);
-        var normale = surfaces[0].getNormal(point);
+        var normale = surfaces[k].getNormal(point);
         console.log("normale = ", normale);
-        console.log("shade = ", shadeP( ray_transform, point_transform, normale, pointLight[0], surfaces[0].materiale ) );
+        console.log("shade = ", shadeP( ray_transform, point_transform, normale, pointLight[0], surfaces[k].materiale ) );
+        console.log("trasformate = ", surfaces[k].trasformate );
+        console.log("trasformateI = ", surfaces[k].trasformateI );
+        console.log("trasformateIT = ", surfaces[k].trasformateIT );
+        console.log("surfaces[k] = ", surfaces[k]);
         console.log("-------------------------------------------");
         DEBUG = false;
     });
