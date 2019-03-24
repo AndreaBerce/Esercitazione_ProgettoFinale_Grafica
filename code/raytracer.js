@@ -304,6 +304,12 @@ var Triangle = function(p1, p2, p3, materiale){
 
 
 
+function distanzaTra2Punti(x, y){
+    return Math.sqrt( Math.pow((y[0] - x[0]), 2) + Math.pow((y[1] - x[1]), 2) + Math.pow((y[2] - x[2]), 2) );
+}
+
+
+
 //shader luce puntiforme
 function shadeA(materiale, k){
     return glMatrix.vec3.fromValues(materials[materiale].ka[0] * ambientLight[k].colore[0],
@@ -314,16 +320,16 @@ function shadeA(materiale, k){
 
 //shader luce puntiforme
 function shadeP(ray, point, normale, light, materiale){
-    return shadeG(ray, point, normale, light, glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point ) ), materiale);
+    return shadeG(ray, point, normale, light, glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point ) ), materiale, distanzaTra2Punti(point, light.punto) );
 }
 
 //shader luce direzionale
 function shadeD(ray, point, normale, light, materiale){
-    return shadeG(ray, point, normale, light, glMatrix.vec3.normalize([], [-light.direzione[0], -light.direzione[1], -light.direzione[2]]), materiale);
+    return shadeG(ray, point, normale, light, glMatrix.vec3.normalize([], [-light.direzione[0], -light.direzione[1], -light.direzione[2]]), materiale, Infinity );
 }
 
 //shader generico
-function shadeG(ray, point, normale, light, l, materiale){
+function shadeG(ray, point, normale, light, l, materiale, distanza){
     // ombra, verifico che non esistano superfici tra il punto e la luce
     var r = new Ray(point, l);
     var temp_ray, temp, t_min = false;
@@ -331,7 +337,7 @@ function shadeG(ray, point, normale, light, l, materiale){
         //calculate the intersection of that ray with the scene
         temp_ray = surfaces[k].hitSurface(r);
         temp = surfaces[k].intersect(temp_ray);
-        if( temp != false && temp > 0 ){
+        if( temp != false && temp > 0 && temp < distanza){
             t_min = temp;
         }
     }
@@ -368,11 +374,12 @@ function shadeGP2(ray, point, normale, light, materiale){
     // ombra, verifico che non esistano superfici tra il punto e la luce
     var r = new Ray(point, l);
     var temp_ray, temp, t_min = false;
+    var distanza = distanzaTra2Punti(point, light.punto);
     for( var k = 0; k < surfaces.length; k++ ){
         //calculate the intersection of that ray with the scene
         temp_ray = surfaces[k].hitSurface(r);
         temp = surfaces[k].intersect(temp_ray);
-        if( temp != false && temp > 0 ){
+        if( temp != false && temp > 0 && temp < distanza){
             t_min = temp;
             console.log("ombra da parte della superficie ", k);
         }
