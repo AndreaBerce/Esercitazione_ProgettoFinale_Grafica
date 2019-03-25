@@ -77,7 +77,7 @@ class Surface{
         SYNOPSIS:
             superficie.traslazione( vettore )
         INPUT:
-            vettore: corrisponde alle traslazioni da effetuare
+            vettore: corrisponde alle traslazioni da effettuare
         OUTPUT:
             void
     */
@@ -93,7 +93,7 @@ class Surface{
         SYNOPSIS:
             superficie.rotazione( vettore )
         INPUT:
-            vettore: corrisponde alle rotazioni da effetuare
+            vettore: corrisponde alle rotazioni da effettuare
         OUTPUT:
             void
     */
@@ -117,7 +117,7 @@ class Surface{
         SYNOPSIS:
             superficie.scala( vettore )
         INPUT:
-            vettore: corrisponde alle scalature da effetuare
+            vettore: corrisponde alle scalature da effettuare
         OUTPUT:
             void
     */
@@ -224,6 +224,9 @@ class Sphere extends Surface{
 }
 
 
+/*Triangle:
+    sottoclasse di Surface
+*/
 class Triangle extends Surface{
     constructor(p1, p2, p3, materiale){
         super(materiale);
@@ -325,7 +328,7 @@ function shadeA(materiale, k){
         colore = shadeP( ray, point, normale, pointLight, materiale )
     INPUT:
         ray:          raggio osservatore
-        point:        punto su cui effetuare il calcolo
+        point:        punto su cui effettuare il calcolo
         normale:      nomale corrispondente al punto dell'oggetto
         pointLight:   luce puntiforme su cui efettuare il calcolo
         materiale:    indice materiale sul vettore materials da usare
@@ -343,7 +346,7 @@ function shadeP(ray, point, normale, light, materiale){
         colore = shadeD( ray, point, normale, directionalLight, materiale )
     INPUT:
         ray:                raggio osservatore
-        point:              punto su cui effetuare il calcolo
+        point:              punto su cui effettuare il calcolo
         normale:            nomale corrispondente al punto dell'oggetto
         directionalLight:   luce direzionale su cui efettuare il calcolo
         materiale:          indice materiale sul vettore materials da usare
@@ -361,7 +364,7 @@ function shadeD(ray, point, normale, light, materiale){
         colore = shadeG( ray, point, normale, Light, l, materiale )
     INPUT:
         ray:        raggio osservatore
-        point:      punto su cui effetuare il calcolo
+        point:      punto su cui effettuare il calcolo
         normale:    nomale corrispondente al punto dell'oggetto
         light:      luce direzionale su cui efettuare il calcolo
         l:          vettore direzione luce
@@ -480,7 +483,7 @@ function trace(ray, nRiflessioni){
 
 
 /*Ray:
-    classe oggetto ray
+    classe ray
 */
 class Ray{
     constructor(p, dir){
