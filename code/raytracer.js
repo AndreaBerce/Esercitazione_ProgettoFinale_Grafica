@@ -19,22 +19,58 @@ var aspect;
 
 var filename = "assets/SphereTest.json";
 
-var Camera = function(eye, up, at){
+var Camera = function(eye,up,at,fovy,aspect){
+    this.eye = eye;
+    this.at = at;
+    this.up = up;
+    this.fovy = fovy;
+    this.aspect = aspect;
+    this.h = 2*Math.tan(rad(fovy/2));
+    this.w = aspect * this.h;
+    this.vpMatrix = glMatrix.mat4.create();
+    //Chiamata alla funzione targetTo che crea la matrice lookAt e la inverte (a differenza della funzione lookAt, che omette quest'ultimo passaggio)
+    glMatrix.mat4.targetTo(this.vpMatrix, [eye[0],eye[1],eye[2]], [at[0],at[1],at[2]], [up[0],up[1],up[2]]);
+
+    this.castRay = function(x,y){
+        //Calcolo della della direzione del raggio: rayDir
+        var u = (this.w*x/(canvas.width-1)) - this.w/2.0;
+        var v = (-this.h*y/(canvas.height-1)) + this.h/2.0;
+        var d = -1;
+        rayDir = glMatrix.vec4.create();
+        glMatrix.mat4.multiply(rayDir,this.vpMatrix,[u,v,d,0]);
+        return new Ray(this.eye, [rayDir[0],rayDir[1],rayDir[2]]);
+    }
+}
+
+var Camera2 = function(eye, up, at, fovy, aspect){
     this.eye = glMatrix.vec3.fromValues(eye[0], eye[1], eye[2]);
     this.up = glMatrix.vec3.fromValues(up[0], up[1], up[2]);
     this.at = glMatrix.vec3.fromValues(at[0], at[1], at[2]);
 
-    /*//this.w = glMatrix.vec3.scale([], glMatrix.vec3.normalize([], this.at), -1);
-    this.w = glMatrix.vec3.normalize([], glMatrix.vec3.scale([], this.at, -1) );
+    /*this.w = glMatrix.vec3.scale([], glMatrix.vec3.normalize([], this.at), -1);
+    //this.w = glMatrix.vec3.normalize([], glMatrix.vec3.scale([], this.at, -1) );
     this.u = glMatrix.vec3.normalize([], glMatrix.vec3.cross([], this.up, this.w));
     this.v = glMatrix.vec3.cross([], this.w, this.u);*/
 
     this.w = glMatrix.vec3.scale([], glMatrix.vec3.subtract([], this.at, this.eye), -1.0);
+    if( this.w[0] == -0 ){ this.w[0] = 0; }
+    console.log("w camera: ", this.w);
     glMatrix.vec3.normalize(this.w, this.w);
     this.u = glMatrix.vec3.cross([], glMatrix.vec3.subtract([], this.up, this.eye), this.w);
     glMatrix.vec3.normalize(this.u, this.u);
     this.v = glMatrix.vec3.cross([], this.w, this.u);
     glMatrix.vec3.normalize(this.v, this.v);
+
+
+
+    //lookAtMatrix = glMatrix.mat4.lookAt([], this.eye, this.at, this.up);
+
+    //var this.viewMatrix = glMatrix.mat4.invert([], lookAtMatrix);
+
+
+
+    //this.height = 2.0 * Math.tan(fovy * Math.PI / 360.0);
+	//this.width = this.height * aspect;
 
     console.log("eye camera: ", this.eye);
     console.log("up camera: ", this.up);
@@ -51,6 +87,15 @@ var Camera = function(eye, up, at){
         dir[0] = - d * this.w[0] + x * this.u[0] + y * this.v[0];
         dir[1] = - d * this.w[1] + x * this.u[1] + y * this.v[1];
         dir[2] = - d * this.w[2] + x * this.u[2] + y * this.v[2];
+
+        /*const uu = this.width * ((x - 0.5) / (canvas.width - 0.5) - 0.5);
+		const vv = -this.height * ((y - 0.5) / (canvas.height - 0.5) - 0.5);
+
+		const du = glMatrix.vec3.scale([0.0, 0.0, 0.0], this.u, uu);
+		const dv = glMatrix.vec3.scale([0.0, 0.0, 0.0], this.v, vv)
+		const dw = glMatrix.vec3.scale([0.0, 0.0, 0.0], this.w, -1.0)
+
+		const dir = glMatrix.vec3.add([0.0, 0.0, 0.0], glMatrix.vec3.add([0.0, 0.0, 0.0], du, dv), dw);*/
 
         var r = new Ray(this.eye, dir);
         return r;
@@ -304,12 +349,6 @@ var Triangle = function(p1, p2, p3, materiale){
 
 
 
-function distanzaTra2Punti(x, y){
-    return Math.sqrt( Math.pow((y[0] - x[0]), 2) + Math.pow((y[1] - x[1]), 2) + Math.pow((y[2] - x[2]), 2) );
-}
-
-
-
 //shader luce puntiforme
 function shadeA(materiale, k){
     return glMatrix.vec3.fromValues(materials[materiale].ka[0] * ambientLight[k].colore[0],
@@ -320,7 +359,7 @@ function shadeA(materiale, k){
 
 //shader luce puntiforme
 function shadeP(ray, point, normale, light, materiale){
-    return shadeG(ray, point, normale, light, glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point ) ), materiale, distanzaTra2Punti(point, light.punto) );
+    return shadeG(ray, point, normale, light, glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point ) ), materiale, glMatrix.vec3.distance(point, light.punto) );
 }
 
 //shader luce direzionale
@@ -339,6 +378,7 @@ function shadeG(ray, point, normale, light, l, materiale, distanza){
         temp = surfaces[k].intersect(temp_ray);
         if( temp != false && temp > 0 && temp < distanza){
             t_min = temp;
+            break;
         }
     }
     if(t_min != false){ // ombra
@@ -528,7 +568,7 @@ function loadSceneFile(filepath){
     //TODO - set up camera
     //set up camera
     aspect = scene.camera.aspect;
-    camera = new Camera(scene.camera.eye, scene.camera.up, scene.camera.at);
+    camera = new Camera(scene.camera.eye, scene.camera.up, scene.camera.at, scene.camera.fovy, scene.camera.aspect);
 
     //TODO - set up surfaces
     for(var i = 0; i < scene.surfaces.length; i++){
@@ -588,7 +628,8 @@ function render(){
             v = (-h*j/(canvas.height-1)) + h/2.0;
 
             //TODO - fire a ray though each pixel
-            var ray = camera.castRay(u, v);
+            //var ray = camera.castRay(u, v);
+            var ray = camera.castRay(i, j);
             setPixel(i, j, trace(ray, scene.bounce_depth) );
         }
     }
