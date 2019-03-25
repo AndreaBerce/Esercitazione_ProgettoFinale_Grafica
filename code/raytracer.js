@@ -4,9 +4,10 @@ var context;
 var imageBuffer;
 
 var DEBUG = false; //whether to show debug messages
-var EPSILON; //error margins
 
-//scene to render
+var EPSILON;
+
+//vettori contenenti tutti gli elementi della scena da renderizzare
 var scene;
 var camera;
 var surfaces;
@@ -17,22 +18,37 @@ var directionalLight;
 
 var filename = "assets/SphereTest.json";
 
+/*Camera:
+    Rappresenta la camera prospettica presente nella scena virtuale.
+
+    Metodi:
+        castRay
+*/
 class Camera{
     constructor(eye,up,at,fovy,aspect){
-        this.eye    = eye;
-        this.at     = at;
-        this.up     = up;
-        this.fovy   = fovy;
-        this.aspect = aspect;
-        this.h      = 2*Math.tan(rad(fovy/2));
-        this.w      = aspect * this.h;
+        this.eye      = eye;
+        this.at       = at;
+        this.up       = up;
+        this.fovy     = fovy;
+        this.aspect   = aspect;
+        this.h        = 2*Math.tan(rad(fovy/2));
+        this.w        = aspect * this.h;
         this.vpMatrix = glMatrix.mat4.create();
-        //targetTo crea la matrice lookAt e la inverte
+        //glMatrix.mat4.targetTo crea la matrice lookAt e la inverte
         glMatrix.mat4.targetTo(this.vpMatrix, [eye[0],eye[1],eye[2]], [at[0],at[1],at[2]], [up[0],up[1],up[2]]);
     }
 
+    /*castRay:
+        Genera il raggio con centro l'occhio della camera e la direzione che passa attraverso il pixel di coordinate (x, y)
+
+        SYNOPSIS:
+            ray = camera.castRay(x, y)
+        INPUT:
+            x, y: coordinate della matrice di visione
+        OUTPUT:
+            oggetto ray, rappresentante il raggio dell'osservatore
+    */
     castRay(x,y){
-        //Calcolo della della direzione del raggio: rayDir
         var u = (this.w*x/(canvas.width-1)) - this.w/2.0;
         var v = (-this.h*y/(canvas.height-1)) + this.h/2.0;
         var d = -1;
@@ -44,7 +60,9 @@ class Camera{
 
 
 
-
+/*Surface:
+    superclasse per Sphere e Triangle. Contiene e gestisce le matrici di trasformazioni per gli oggetti della scena da rappresentare
+*/
 class Surface{
     constructor(materiale){
         this.materiale      = materiale;
@@ -53,15 +71,33 @@ class Surface{
         this.trasformateIT  = glMatrix.mat4.transpose([], this.trasformateI);
     }
 
+    /*traslazione:
+        Traspone la matrice delle trasformate
+
+        SYNOPSIS:
+            superficie.traslazione( vettore )
+        INPUT:
+            vettore: corrisponde alle traslazioni da effetuare
+        OUTPUT:
+            void
+    */
     traslazione(vettore){
-        console.log("traslazione sfera");
         glMatrix.mat4.translate(this.trasformate, this.trasformate, vettore);
         glMatrix.mat4.invert(this.trasformateI, this.trasformate);
         glMatrix.mat4.transpose(this.trasformateIT, this.trasformateI);
     }
 
+    /*rotazione:
+        Ruota la matrice delle trasformate
+
+        SYNOPSIS:
+            superficie.rotazione( vettore )
+        INPUT:
+            vettore: corrisponde alle rotazioni da effetuare
+        OUTPUT:
+            void
+    */
     rotazione(vettore){
-        console.log("rotazione sfera");
         if( vettore[0] != 0 ){
             glMatrix.mat4.rotateX(this.trasformate, this.trasformate, rad(vettore[0]) );
         }
@@ -73,23 +109,50 @@ class Surface{
         }
         glMatrix.mat4.invert(this.trasformateI, this.trasformate);
         glMatrix.mat4.transpose(this.trasformateIT, this.trasformateI);
-        console.log("rotazione: ", this.trasformate, this.trasformateI);
     }
 
+    /*scala:
+        Scala la matrice delle trasformate
+
+        SYNOPSIS:
+            superficie.scala( vettore )
+        INPUT:
+            vettore: corrisponde alle scalature da effetuare
+        OUTPUT:
+            void
+    */
     scala(vettore){
-        console.log("scala sfera");
         glMatrix.mat4.scale(this.trasformate, this.trasformate, vettore);
         glMatrix.mat4.invert(this.trasformateI, this.trasformate);
         glMatrix.mat4.transpose(this.trasformateIT, this.trasformateI);
-        console.log("scalatura: ", this.trasformate, this.trasformateI);
     }
 
+    /*hitSurface:
+        trasforma il raggio ray in base alle trasformate dell'oggetto
+
+        SYNOPSIS:
+            superficie.hitSurface( ray )
+        INPUT:
+            ray: raggio da trasformare
+        OUTPUT:
+            oggetto ray
+    */
     hitSurface(ray){
         var temp = glMatrix.mat4.multiply([], this.trasformateI, [ray.p[0], ray.p[1], ray.p[2], 1]);
         var temp2 = glMatrix.mat4.multiply([], this.trasformateI, [ray.dir[0], ray.dir[1], ray.dir[2], 0]);
         return new Ray( [temp[0], temp[1], temp[2]], [temp2[0], temp2[1], temp2[2]] );
     }
 
+    /*trasformation_point:
+        cambia le coordinate del punto dal riferimento mondo a quello di questo oggetto 
+
+        SYNOPSIS:
+            superficie.trasformation_point( point )
+        INPUT:
+            point: punto da trasformare
+        OUTPUT:
+            point
+    */
     trasformation_point(point){
         var temp = glMatrix.mat4.multiply([], this.trasformate, [point[0], point[1], point[2], 1]);
         return glMatrix.vec3.fromValues(temp[0], temp[1], temp[2]);
@@ -97,16 +160,27 @@ class Surface{
 }
 
 
+/*Sphere:
+    sottoclasse di Surface
+*/
 class Sphere extends Surface{
     constructor(centro, raggio, materiale){
         super(materiale);
         this.centro  = centro;
         this.raggio  = raggio;
         this.raggio2 = raggio*raggio;
-        //console.log("sfera inserita");
-        //console.log("sfera", this.centro);
     }
 
+    /*intersect:
+        calcolo distanza tra il punto di osservazione e l'oggetto
+
+        SYNOPSIS:
+            t = superficie.intersect( ray_transform )
+        INPUT:
+            ray_transform: raggio osservatore trasformato
+        OUTPUT:
+            t:             distanza tra il punto di vista e l'oggetto colpito lungo il vettore direzione
+    */
     intersect(ray){
         var p  = glMatrix.vec3.subtract([], ray.p, this.centro);
         var dp = glMatrix.vec3.dot(ray.dir,p);
@@ -131,6 +205,17 @@ class Sphere extends Surface{
         }
     }
 
+    /*getNormal:
+        calcolo vettore normale corrispondente al punto point che appartiene all'oggetto
+
+        SYNOPSIS:
+            normale = superficie.getNormal( point, ray_transform )
+        INPUT:
+            point:   punto appartenente all'oggetto
+            ray:     raggio osservatore trasformato
+        OUTPUT:
+            normale: normale nel punto appartenente all'oggetto
+    */
     getNormal(point, ray){
         var temp = glMatrix.vec3.subtract([], point, this.centro );
         glMatrix.mat4.multiply( temp, this.trasformateIT, [temp[0], temp[1], temp[2], 0] );
@@ -146,10 +231,18 @@ class Triangle extends Surface{
         this.b = p2;
         this.c = p3;
         this.materiale = materiale;
-        console.log("triangolo inserito");
-        //console.log("triangolo a:", this.a, " b: ", this.b, " c: ", this.c);
     }
 
+   /*intersect:
+        calcolo distanza tra il punto di osservazione e l'oggetto
+
+        SYNOPSIS:
+            t = superficie.intersect( ray_transform )
+        INPUT:
+            ray_transform: raggio osservatore trasformato
+        OUTPUT:
+            t:             distanza tra il punto di vista e l'oggetto colpito lungo il vettore direzione
+    */
     intersect(ray){
         var ab = glMatrix.vec3.subtract([], this.a, this.b);
         var ac = glMatrix.vec3.subtract([], this.a, this.c);
@@ -181,6 +274,17 @@ class Triangle extends Surface{
         return t;
     }
 
+    /*getNormal:
+        calcolo vettore normale corrispondente al punto point che appartiene all'oggetto
+
+        SYNOPSIS:
+            normale = superficie.getNormal( point, ray_transform )
+        INPUT:
+            point:   punto appartenente all'oggetto
+            ray:     raggio osservatore trasformato
+        OUTPUT:
+            normale: normale nel punto appartenente all'oggetto
+    */
     getNormal(point, ray){
         var temp1 = glMatrix.vec3.subtract([], this.c, this.a);
         var temp2 = glMatrix.vec3.subtract([], this.b, this.a);
@@ -196,7 +300,17 @@ class Triangle extends Surface{
 
 
 
-//shader luce puntiforme
+/*ShadeA:
+    shader luce ambientale
+
+    SYNOPSIS:
+        colore = shadeA( superficie.materiale, k )
+    INPUT:
+        materiale: indice materiale sul vettore materials da usare
+        k:         indice luce ambientale sul vettore ambientLight
+    OUTPUT:
+        colore:    colore risultante
+*/
 function shadeA(materiale, k){
     return glMatrix.vec3.fromValues(materials[materiale].ka[0] * ambientLight[k].colore[0],
                                     materials[materiale].ka[1] * ambientLight[k].colore[1],
@@ -204,17 +318,58 @@ function shadeA(materiale, k){
 }
 
 
-//shader luce puntiforme
+/*ShadeP:
+    shader luce puntiforme
+
+    SYNOPSIS:
+        colore = shadeP( ray, point, normale, pointLight, materiale )
+    INPUT:
+        ray:          raggio osservatore
+        point:        punto su cui effetuare il calcolo
+        normale:      nomale corrispondente al punto dell'oggetto
+        pointLight:   luce puntiforme su cui efettuare il calcolo
+        materiale:    indice materiale sul vettore materials da usare
+    OUTPUT:
+        colore:       colore risultante
+*/
 function shadeP(ray, point, normale, light, materiale){
     return shadeG(ray, point, normale, light.colore, glMatrix.vec3.normalize( [], glMatrix.vec3.subtract([], light.punto, point ) ), materiale, glMatrix.vec3.distance(point, light.punto) );
 }
 
-//shader luce direzionale
+/*ShadeD:
+    shader luce direzionale
+
+    SYNOPSIS:
+        colore = shadeD( ray, point, normale, directionalLight, materiale )
+    INPUT:
+        ray:                raggio osservatore
+        point:              punto su cui effetuare il calcolo
+        normale:            nomale corrispondente al punto dell'oggetto
+        directionalLight:   luce direzionale su cui efettuare il calcolo
+        materiale:          indice materiale sul vettore materials da usare
+    OUTPUT:
+        colore:             colore risultante
+*/
 function shadeD(ray, point, normale, light, materiale){
     return shadeG(ray, point, normale, light.colore, glMatrix.vec3.normalize([], [-light.direzione[0], -light.direzione[1], -light.direzione[2]]), materiale, Infinity );
 }
 
-//shader generico
+/*ShadeG:
+    shader generico. Usato per la luce puntiforme e direzionale
+
+    SYNOPSIS:
+        colore = shadeG( ray, point, normale, Light, l, materiale )
+    INPUT:
+        ray:        raggio osservatore
+        point:      punto su cui effetuare il calcolo
+        normale:    nomale corrispondente al punto dell'oggetto
+        light:      luce direzionale su cui efettuare il calcolo
+        l:          vettore direzione luce
+        materiale:  indice materiale sul vettore materials da usare
+        distanza:   distanza da cui si trova la luce
+    OUTPUT:
+        colore:     colore risultante
+*/
 function shadeG(ray, point, normale, light, l, materiale, distanza){
     // ombra, verifico che non esistano superfici tra il punto e la luce
     var r = new Ray(point, l);
@@ -257,6 +412,20 @@ function shadeG(ray, point, normale, light, l, materiale, distanza){
 }
 
 
+/*trace:
+    funzione che si occupa di verificare se il raggio dato interseca un qualunque oggetto.
+    Nel caso negativo, restituisce il colore nero.
+    Nel caso positivo, calcola il colore del punto intersecato, dell'oggetto più vicino all'origine del raggio, su tutte le luci, 
+    verificando che non sia in obra e se neccessario si itera per calcolare la riflessione della superficie
+    
+    SYNOPSIS:
+        colore = trace(ray , nRiflessioni)
+    INPUT:
+        ray:            raggio osservatore
+        nRiflessioni:   numero riflessioni da eseguire
+    OUTPUT:
+        colore:         colore risultante
+*/
 function trace(ray, nRiflessioni){
     var t_min = false;
     var temp_ray;
@@ -310,52 +479,71 @@ function trace(ray, nRiflessioni){
 
 
 
+/*Ray:
+    classe oggetto ray
+*/
 class Ray{
     constructor(p, dir){
-        this.p = p;       //origine
+        this.p   = p;     //origine
         this.dir = dir;   //direzione
     }
 
+    /*pointAtParameter:
+        calcolo punto dato la distanza dal punto di osservazione
+
+        SYNOPSIS:
+            point = ray.pointAtParameter( t )
+        INPUT:
+            t:      distanza dal punto di osservazione
+        OUTPUT:
+            point:  punto risultante
+    */
     pointAtParameter( t ){//return A + t * d
         return glMatrix.vec3.add([], this.p, glMatrix.vec3.scale([], this.dir, t));
     }
 }
 
-//Lighting
+
+//classi dell luci ambientali, puntifomi e direzionali
 class AmbientLight{
     constructor(colore){
         this.colore = colore;
-        console.log("luce ambientale: ", colore);
     }
 }
 
 class PointLight{
     constructor(colore, punto){
         this.colore = colore;
-        this.punto = punto;
-        console.log("luce puntiforme: colore: ", colore, " punto: ", punto);
+        this.punto  = punto;
     }
 }
 
 class DirectionalLight{
     constructor(colore, direzione){
-        this.colore = colore;
+        this.colore    = colore;
         this.direzione = direzione;
     }
 }
 
+
+//classe Material
 class Material{
     constructor(ka, kd, ks, shininess, kr){
-        this.ka = ka;
-        this.kd = kd;
-        this.ks = ks;
-        this.shininess = shininess;
-        this.kr = kr;
+        this.ka         = ka;
+        this.kd         = kd;
+        this.ks         = ks;
+        this.shininess  = shininess;
+        this.kr         = kr;
     }
 }
 
 
-//initializes the canvas and drawing buffers
+/*init:
+    inizializzazione della canvas, preparazione buffer dei pixel e caricamento di tutti gli oggetti della scena sui rispettivi vettori
+
+    SYNOPSIS:
+        init()
+*/
 function init(){
     canvas           = $('#canvas')[0];
     context          = canvas.getContext("2d");
@@ -371,20 +559,23 @@ function init(){
 }
 
 
-//loads and "parses" the scene file at the given path
+/*loadSceneFile:
+    lettura del file passato e caricamento di tutti gli oggetti della scena sui rispettivi vettori
+
+    SYNOPSIS:
+        loadSceneFile(filepath)
+    INPUT:
+        filepath:   path del file da renderizzare
+*/
 function loadSceneFile(filepath){
-    scene = Utils.loadJSON(filepath); //load the scene
+    scene = Utils.loadJSON(filepath); //caricamento di scene
 
-    console.log(scene.camera); //loading is ok
+    console.log(scene.camera);
 
-    //TODO - set up camera
-    //set up camera
     EPSILON = scene.shadow_bias;
     camera = new Camera(scene.camera.eye, scene.camera.up, scene.camera.at, scene.camera.fovy, scene.camera.aspect);
 
-    //TODO - set up surfaces
     for(var i = 0; i < scene.surfaces.length; i++){
-        console.log("i = ", i);
         if (scene.surfaces[i].shape == "Sphere") {
             surfaces.push( new Sphere(scene.surfaces[i].center, scene.surfaces[i].radius, scene.surfaces[i].material) );
         }
@@ -394,7 +585,6 @@ function loadSceneFile(filepath){
 
         if( scene.surfaces[i].hasOwnProperty('transforms') ){
             for( var j = 0; j < (scene.surfaces[i].transforms.length); j++ ){
-                console.log("trasformata: ", j);
                 if( scene.surfaces[i].transforms[j][0] == "Translate" ){
                     surfaces[i].traslazione( scene.surfaces[i].transforms[j][1] );
                 }
@@ -427,22 +617,26 @@ function loadSceneFile(filepath){
 }
 
 
-//renders the scene
-function render(){
-    var start = Date.now(); //for logging
+/*render:
+    renders della scena
 
-    for (var i = 0; i <= canvas.width;  i++){ //indice bordo sinistro se i=0 (bordo destro se i = nx-1)
+    SYNOPSIS:
+        render()
+*/
+function render(){
+    var start = Date.now();
+
+    for (var i = 0; i <= canvas.width;  i++){
         for (var j = 0; j <= canvas.height; j++){
-            //TODO - fire a ray though each pixel
             var ray = camera.castRay(i, j);
             setPixel(i, j, trace(ray, scene.bounce_depth) );
         }
     }
 
-    //render the pixels that have been set
+    //carica immagine calcolata
     context.putImageData(imageBuffer,0,0);
 
-    var end = Date.now(); //for logging
+    var end = Date.now();
     $('#log').html("rendered in: "+(end-start)+"ms");
     console.log("rendered in: "+(end-start)+"ms");
 
